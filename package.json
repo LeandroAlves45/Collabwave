@@ -1,0 +1,15 @@
+{
+  "name": "collabwave",
+  "version": "1.0.0",
+  "description": "Collabwave monorepo root - tooling only",
+  "private": true,
+  "scripts": {
+    "lint:backend": "npm run lint --prefix backend",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.0.10"
+  }
+}

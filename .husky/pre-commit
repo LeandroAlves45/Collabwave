@@ -1,0 +1,22 @@
+# .husky/pre-commit
+# Este script é executado automaticamente pelo Git antes de cada commit.
+# Se o script terminar com um código de erro (exit code != 0),
+# o commit é BLOQUEADO e o Git mostra uma mensagem de erro.
+# Se terminar com sucesso (exit code 0), o commit prossegue normalmente.
+
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# --- Backend: lint ---
+echo "Checking backend (ESLint)..."
+
+# "--prefix backend" garante que o comando seja executado na pasta correta
+npm run lint --prefix backend
+
+# --- Frontend: lint ---
+echo "Checking frontend (ESLint)..."
+npm run lint --prefix frontend
+
+echo "All checks passed. Proceeding with commit."

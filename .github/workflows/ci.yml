@@ -1,0 +1,62 @@
+# ============================================================
+# CollabWave — Continuous Integration Workflow
+# ============================================================
+# Este workflow é executado automaticamente pelo GitHub Actions
+# nos seguintes eventos:
+#   - push para os branches "develop" ou "main"
+#   - pull_request com destino a "develop" ou "main"
+
+name: CI
+
+# TRIGGERS - quando o workflow deve ser executado
+on:
+  push:
+    branches:
+      - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+
+# JOBS - define os trabalhos a serem executados
+jobs:
+  lint-and-test:
+    name: Lint, Test and Build
+    runs-on: ubuntu-latest
+
+    # STEPS - etapas do trabalho
+    steps:
+      # Checkout do código-fonte
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Configuração do Node.js
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # Instalação das dependências
+      - name: Install dependencies
+        run: npm ci
+
+      # Execução do lint
+      - name: Run ESLint
+        run: npm run lint
+
+      # Execução dos testes com coverage
+      #- name: Run tests with coverage
+      #run: npm run test:ci
+
+      # Build de produção
+      #- name: Build production bundle
+      #run: npm run build
+
+      # Upload do coverage para o Codecov
+      #- name: Upload coverage to Codecov
+      #uses: codecov/codecov-action@v4
+      #with:
+      #token: ${{ secrets.CODECOV_TOKEN }}
+      #fail_ci_if_error: true
