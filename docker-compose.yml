@@ -1,0 +1,101 @@
+# ============================================================
+# CollabWave — Docker Compose (Local Development)
+# ============================================================
+# Orquestra todos os serviços necessários para desenvolvimento local.
+# Uso: docker-compose up --build
+
+# Versão do Docker Compose
+version: "3.9"
+
+# VOLUMES - armazenamento persistente para dados e código
+volumes:
+  postgres_data:
+  redis_data:
+
+# NETWORKS - rede personalizada para comunicação entre serviços
+networks:
+  collabwave_network:
+    driver: bridge
+
+# SERVICES - definição dos serviços (containers)
+services:
+  # POSTGRES - banco de dados relacional
+  postgres:
+    image: postgres:15-alpine
+    container_name: collabwave_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    ports:
+      - "5432:5432"
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - collabwave_network
+
+  # REDIS - Cache e pub/sub para Socket.io
+  redis:
+    image: redis:7-alpine
+    container_name: collabwave_redis
+    restart: unless-stopped
+
+    command: redis-server --appendonly yes
+
+    volumes:
+      - redis_data:/data
+
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    networks:
+      - collabwave_network
+
+  # BACKEND - API REST e WebSocket server
+  backend:
+    build:
+      context: ./backend
+      target: development
+
+    container_name: collabwave_backend
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+      REDIS_URL: redis://redis:6379
+
+    ports:
+      - "3001:3001"
+
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - collabwave_network

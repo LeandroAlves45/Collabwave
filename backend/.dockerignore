@@ -1,0 +1,37 @@
+# ============================================================
+# CollabWave Backend — .dockerignore
+# ============================================================
+# Ficheiros e pastas excluídos do contexto de build do Docker.
+# Regra: excluir tudo o que não é necessário para correr a app.
+# ============================================================
+
+# Dependências
+node_modules/
+
+# Output de compilação
+dist/
+
+# Cobertura de testes
+coverage/
+
+# Ficheiros de ambiente
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentação e ferramentas de desenvolvimento
+README.md
+.eslintrc*
+.prettierrc*
+jest.config.*
+
+# OS artifacts
+.DS_Store
+Thumbs.db
