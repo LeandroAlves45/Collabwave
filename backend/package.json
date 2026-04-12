@@ -4,9 +4,9 @@
   "description": "Collabwave REST API and WebSocket server",
   "main": "dist/app.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/app.ts",
+    "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc --project tsconfig.json",
-    "start": "node dist/app.js",
+    "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "test": "jest --watchAll",
     "test:ci": "jest --ci --coverage --forceExit",

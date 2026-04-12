@@ -25,7 +25,7 @@ export async function up(knex: Knex): Promise<void> {
     // Utilizador que realizou a acção
     table
       .uuid('user_id')
-      .notNullable()
+      .nullable()
       .references('id')
       .inTable('users')
       // SET NULL preserva o log mesmo que o utilizador seja eliminado
