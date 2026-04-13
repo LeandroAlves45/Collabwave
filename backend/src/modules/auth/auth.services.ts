@@ -47,8 +47,12 @@ const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 // -------------------------------------------------------------
 
 // Gera um JWT de acesso de curta duração (ex: 15 minutos)
-function generateAccessToken(userId: string, email: string): string {
-  const payload: JwtAccessPayload = { sub: userId, email };
+function generateAccessToken(
+  userId: string,
+  email: string,
+  name: string,
+): string {
+  const payload: JwtAccessPayload = { sub: userId, email, name };
 
   return jwt.sign(payload, env.JWT_SECRET, {
     expiresIn: env.JWT_EXPIRES_IN,
@@ -85,7 +89,7 @@ async function deleteRefreshToken(jti: string): Promise<void> {
 
 // Remove dados sensíveis do objeto User antes de enviar na resposta
 function sanitizeUser(user: User): SafeUser {
-  const { password_hash, ...safeUser } = user;
+  const { password_hash: _password_hash, ...safeUser } = user;
   return safeUser;
 }
 
@@ -120,7 +124,7 @@ export async function register(
     .returning('*');
 
   // Gerar tokens de autenticação
-  const accessToken = generateAccessToken(user.id, user.email);
+  const accessToken = generateAccessToken(user.id, user.email, user.name);
   const refreshToken = generateRefreshToken(user.id);
 
   // Guardar o refresh token no Redis para controlo de sessão
@@ -160,7 +164,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
   }
 
   // Gerar tokens de autenticação
-  const accessToken = generateAccessToken(user.id, user.email);
+  const accessToken = generateAccessToken(user.id, user.email, user.name);
   const refreshToken = generateRefreshToken(user.id);
 
   // Guardar o refresh token no Redis para controlo de sessão
@@ -212,7 +216,7 @@ export async function refresh(
   }
 
   // Gerar novos tokens de autenticação
-  const accessToken = generateAccessToken(user.id, user.email);
+  const accessToken = generateAccessToken(user.id, user.email, user.name);
   const newRefreshToken = generateRefreshToken(user.id);
 
   // Guardar o novo refresh token no Redis

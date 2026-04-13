@@ -14,7 +14,6 @@
 // ============================================================
 
 import { Server, Socket } from 'socket.io';
-import { string } from 'zod';
 
 // -----------------------------------------------------------
 // Tipos de dados partilhados
@@ -75,16 +74,16 @@ export interface SocketData {
 // Aliases tipados para Socket e Server com os nossos genéricos
 // Usar estes tipos de handlers garante type safety completo
 
-export type CollabWaveSocket = Socket
+export type CollabWaveSocket = Socket<
   ClientToServerEvents,
   ServerToClientEvents,
-  Record<string, never>,  // Sem eventos server-to-server explicítos
+  Record<string, never>,  // Sem eventos server-to-server explícitos
   SocketData
 >;
 
-export type CollabWaveServer = Server
+export type CollabWaveServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
-  Record<string, never>,  // Sem eventos server-to-server explicítos
+  Record<string, never>,  // Sem eventos server-to-server explícitos
   SocketData
 >;

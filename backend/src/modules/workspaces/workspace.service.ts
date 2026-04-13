@@ -222,7 +222,7 @@ export async function getWorkspaceMembers(
       'users.id as user_id', // Alias para evitar conflito de nomes
       'users.name',
       'users.email',
-      'workspace_members.worspace_id',
+      'workspace_members.workspace_id',
       'workspace_members.role',
       'workspace_members.joined_at',
     )

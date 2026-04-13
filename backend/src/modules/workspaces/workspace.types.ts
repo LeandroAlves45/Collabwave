@@ -43,7 +43,7 @@ export interface WorkspaceMember {
 // WorkspaceRole
 // ----------------------------------------------------------
 // Union type para os papéis possíveis de um membro num workspace.
-export type WorkspaceRole = 'owner' | 'editor' | 'member';
+export type WorkspaceRole = 'owner' | 'admin' | 'member';
 
 // ----------------------------------------------------------
 // WorkspaceWithRole

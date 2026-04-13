@@ -17,7 +17,7 @@
 //     A sessão WebSocket persiste após autenticação.
 // ============================================================
 
-import type { ExtendedError } from 'socket.io/dist/namespace';
+import type { ExtendedError } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
 import type { CollabWaveSocket, AuthenticatedUser } from '../sockets.types';

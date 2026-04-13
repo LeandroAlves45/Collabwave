@@ -45,7 +45,8 @@ export interface LoginPayload {
 // Payload que é assinado dentro do acess token JWT
 export interface JwtAccessPayload {
   sub: string; // ID do utilizador, "subject" - convenção JWT para o ID do utilizador
-  email: string;
+  email: string; // Email do utilizador
+  name: string; // Nome do utilizador
 }
 
 // Payload que é assinado dentro do refresh token JWT

@@ -46,10 +46,10 @@ export class AppError extends Error {
 // devolve uma resposta JSON consistente.
 export function errorHandler(
   err: Error,
-  req: Request,
+  _req: Request,
   res: Response,
-  // next é obrigatório para o Express reconhecer esta função como middleware de erro, mesmo que não seja usado
-  next: NextFunction,
+  // _next é obrigatório para o Express reconhecer esta função como middleware de erro (4 parâmetros), mesmo que não seja usado
+  _next: NextFunction,
 ): void {
   // Se o erro for uma instância de AppError, é um erro operacional
   if (err instanceof AppError) {

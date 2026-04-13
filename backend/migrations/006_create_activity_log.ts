@@ -34,8 +34,8 @@ export async function up(knex: Knex): Promise<void> {
     // Tipo de evento (e.g., "task_created", "task_moved", "member.joined")
     table.string('action', 50).notNullable();
 
-    // Dados adicionais da ação em formato JSON
-    table.jsonb('metadata').notNullable();
+    // Dados adicionais da ação em formato JSON (opcional — nem todos os eventos têm payload extra)
+    table.jsonb('metadata').nullable();
 
     // Quando a acção ocorreu
     table.timestamp('created_at', { useTz: true }).defaultTo(knex.fn.now());

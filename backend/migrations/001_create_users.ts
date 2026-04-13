@@ -27,8 +27,8 @@ export async function up(knex: Knex): Promise<void> {
     // Hash da password (bcryptjs)
     table.string('password_hash', 255).notNullable();
 
-    // URL do avatar
-    table.string('avatar_url').notNullable();
+    // URL do avatar (opcional — utilizador pode não ter foto de perfil)
+    table.string('avatar_url').nullable();
 
     // Timestamp de criação
     table.timestamp('created_at', { useTz: true }).defaultTo(knex.fn.now());

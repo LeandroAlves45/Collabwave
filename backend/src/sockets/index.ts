@@ -15,7 +15,7 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import type { Server as HttpServer } from 'http';
-import { redisClient, pubClient, subClient } from '../config/redis';
+import { pubClient, subClient } from '../config/redis';
 import { env } from '../config/env';
 import { socketAuthMiddleware } from './middleware/socketAuth';
 import { registerWorkspaceHandler } from './handlers/workspace.handler';
@@ -40,7 +40,9 @@ export function initSocketServer(httpServer: HttpServer): Server {
         },
 
         // Configuração de transports
-        transports: ['websocket', 'polling'], // Forçar uso de WebSocket (sem fallback para polling)
+        // 'websocket' é o protocolo principal; 'polling' actua como fallback automático
+        // para redes que bloqueiam WebSocket (proxies corporativos, etc.)
+        transports: ['websocket', 'polling'],
 
         // Configurações de ping/pong para detecção de conexões ativas
         pingInterval: 10000, // Enviar ping a cada 20 segundos

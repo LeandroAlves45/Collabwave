@@ -26,34 +26,6 @@ import {
 import * as workspaceService from './workspace.service';
 
 // --------------------------------------------------------------
-// Extensão do tipo Request do Express
-// ---------------------------------------------------------------
-// O Express não tem req.user por defeito. O middleware de auth
-// do Sprint 1 (authenticate) coloca os dados do utilizador
-// autenticado em req.user após validar o JWT.
-//
-// declare global + namespace Express é o mecanismo TypeScript
-// para estender tipos de bibliotecas externas (declaration merging).
-// Esta declaração diz ao TypeScript: "o objecto Request do Express
-// pode ter uma propriedade user com esta forma".
-//
-// ? NOTA: Esta declaração deveria idealmente viver num ficheiro
-// ? global de tipos (ex: src/types/express.d.ts). Colocamo-la
-// ? aqui por simplicidade — será movida se outros controllers
-// ? precisarem da mesma extensão.
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: string;
-        email: string;
-        name: string;
-      };
-    }
-  }
-}
-
-// --------------------------------------------------------------
 // asyncHandler
 // --------------------------------------------------------------
 // Wrapper que envolve handlers assíncronos para capturar erros.

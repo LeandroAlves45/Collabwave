@@ -10,7 +10,10 @@
 // ============================================================
 
 import type { Knex } from 'knex';
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // CONFIGURAÇÕES POR AMBIENTE
 const config: Record<string, Knex.Config> = {
@@ -25,7 +28,7 @@ const config: Record<string, Knex.Config> = {
     },
     pool: { min: 2, max: 10 },
     migrations: {
-      directory: './migrations',
+      directory: '../../migrations',
       extension: 'ts',
       tableName: 'knex_migrations',
     },
@@ -41,7 +44,7 @@ const config: Record<string, Knex.Config> = {
     },
     pool: { min: 2, max: 10 },
     migrations: {
-      directory: './migrations',
+      directory: '../../migrations',
       extension: 'ts',
       tableName: 'knex_migrations',
     },

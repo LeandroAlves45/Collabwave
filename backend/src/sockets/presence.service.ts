@@ -137,7 +137,7 @@ export async function removeUserFromAllWorkspaces(
       await redisClient.srem(key, userId);
 
       // Extrai workspaceId da chave (removendo o prefixo)
-      const workspaceId = key.replace(`${PRESENCE_PREFIX}:`, '');
+      const workspaceId = key.replace(PRESENCE_PREFIX, '');
       affectedWorkspacesIds.push(workspaceId);
     }
   }
