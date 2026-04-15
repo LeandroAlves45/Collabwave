@@ -1,28 +1,25 @@
 import Redis from 'ioredis';
 import { env } from './env';
 
-// OPÇÕES PARTILHADAS
+// Opcoes partilhadas pelos clientes Redis.
 
 const redisOptions = {
-  // Configurações de conexão automática
   maxRetriesPerRequest: null,
 
-  // Estratégia de reconexão
+  // Em testes, evita ligar ao Redis real durante o import.
+  lazyConnect: env.NODE_ENV === 'test',
+
   retryStrategy(times: number): number {
-    return Math.min(times * 50, 2000); // Exponencial backoff
+    return Math.min(times * 50, 2000); // Backoff limitado a 2s.
   },
 };
 
-// CLIENTE PRINCIPAL
+// Cliente principal usado pela aplicacao.
 export const redisClient = new Redis(env.REDIS_URL, redisOptions);
 
-// PUB CLIENTE - para o Socket.io Redis Adapter
+// Clientes dedicados ao Redis Adapter do Socket.io.
 export const pubClient = new Redis(env.REDIS_URL, redisOptions);
-
-// SUB CLIENTE - para o Socket.io Redis Adapter
 export const subClient = pubClient.duplicate();
-
-// EVENT LISTENER - logging e monitoramento
 
 redisClient.on('connect', () => {
   console.log('[REDIS] Connected successfully');

@@ -1,13 +1,4 @@
-// ============================================================
-// CollabWave — Express Type Augmentation
-// ============================================================
-// Estende o tipo Request do Express para incluir req.user,
-// preenchido pelo middleware authenticate após validação do JWT.
-//
-// Esta declaração é global e aplicada automaticamente a todos
-// os ficheiros que importem tipos do Express — não é necessário
-// importar este ficheiro explicitamente.
-// ============================================================
+// Augmenta Express.Request com req.user preenchido pelo middleware auth.
 
 declare global {
   namespace Express {

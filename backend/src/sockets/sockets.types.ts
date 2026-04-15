@@ -1,89 +1,90 @@
-// ============================================================
-// CollabWave — Socket.io Type Definitions
-// ============================================================
-// O Socket.io v4 suporta tipagem genérica completa.
-// Definimos aqui os tipos dos eventos e dos dados do socket
-// para ter type safety em toda a camada WebSocket.
-//
-// ESTRUTURA DOS GENÉRICOS DO SOCKET.IO:
-// Server<ClientToServer, ServerToClient, ServerToServer, SocketData>
-//   - ClientToServer:  eventos que o cliente envia ao servidor
-//   - ServerToClient:  eventos que o servidor envia ao cliente
-//   - ServerToServer:  eventos entre servidores (via Redis adapter)
-//   - SocketData:      dados armazenados em socket.data (tipo seguro)
-// ============================================================
+// Contratos tipados dos eventos Socket.io e de socket.data.
 
 import { Server, Socket } from 'socket.io';
+import type { Task } from '../modules/tasks/task.types.js';
 
-// -----------------------------------------------------------
-// Tipos de dados partilhados
-// -----------------------------------------------------------
-
-// Representa o utilizador autenticado, extráido do token JWT
-// e armazena em socket.data após validação 
 export interface AuthenticatedUser {
-    id: string; // UUID do utilizador
-    email: string; // Email do utilizador
-    name: string; // Nome do utilizador
+  id: string; // UUID do utilizador
+  email: string; // Email do utilizador
+  name: string; // Nome do utilizador
 }
-
-// -----------------------------------------------------------
-// Eventos: Cliente -> Servidor
-// -----------------------------------------------------------
-// Define o contrato dos eventos que o cliente pode emitir
 
 export interface ClientToServerEvents {
-  // Pede para entrar na room de um workspace
   'workspace:join': (payload: { workspaceId: string }) => void;
-
-  // Pede para sair da room de um workspace
   'workspace:leave': (payload: { workspaceId: string }) => void;
 
-  // Envia posição do cursor (throttled pelo cliente)
-  'cursor:move': (payload: { workspaceId: string; x: number; y: number }) => void;
-}
+  'cursor:move': (payload: {
+    workspaceId: string;
+    x: number;
+    y: number;
+  }) => void;
 
-// -----------------------------------------------------------
-// Eventos: Servidor -> Cliente
-// ------------------------------------------------------------
-// Define os eventos que o servidor pode emitir para os clientes
+  'task:create': (payload: {
+    workspaceId: string;
+    columnId: string;
+    title: string;
+    description?: string;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    dueDate?: string;
+  }) => void;
+
+  'task:update': (payload: {
+    taskId: string;
+    fields: Partial<
+      Pick<
+        Task,
+        'title' | 'description' | 'priority' | 'due_date' | 'assignee_id'
+      >
+    >;
+  }) => void;
+
+  'task:move': (payload: {
+    taskId: string;
+    targetColumnId: string;
+    newPosition: number;
+  }) => void;
+
+  'task:delete': (payload: { taskId: string }) => void;
+}
 
 export interface ServerToClientEvents {
-  // Atualização da lista de utilizadores online num workspace
-  'workspace:presence_update': (payload: { onlineUsers: AuthenticatedUser[] }) => void;
+  'workspace:presence_update': (payload: {
+    onlineUsers: AuthenticatedUser[];
+  }) => void;
 
-  // Notificação de erro (ex: autenticação falhou)
-  'error': (payload: { code: string, message: string }) => void;
+  error: (payload: { code: string; message: string }) => void;
 
-  // Atualização das posições dos cursores (broadcast throttled)
-  'cursor:positions': (payload: { cursors: Array<{ userId: string; x: number; y: number }> }) => void;
+  'cursor:positions': (payload: {
+    cursors: Array<{ userId: string; x: number; y: number }>;
+  }) => void;
+
+  'task:created': (payload: { task: Task }) => void;
+  'task:updated': (payload: { task: Task }) => void;
+
+  'task:moved': (payload: {
+    taskId: string;
+    targetColumnId: string;
+    newPosition: number;
+    movedBy: string;
+  }) => void;
+
+  'task:deleted': (payload: { taskId: string; deletedBy: string }) => void;
 }
-
-// -----------------------------------------------------------
-// Dados do Socket (socket.data)
-// -----------------------------------------------------------
-// Tipagem do objeto socket.data. Dados associados a cada socket
 
 export interface SocketData {
-  user: AuthenticatedUser; // Dados do utilizador autenticado
+  user: AuthenticatedUser;
 }
-
-// -----------------------------------------------------------
-// Tipos derivados para uso nos handlers
-// ------------------------------------------------------------
-// Aliases tipados para Socket e Server com os nossos genéricos
-// Usar estes tipos de handlers garante type safety completo
 
 export type CollabWaveSocket = Socket<
   ClientToServerEvents,
   ServerToClientEvents,
-  Record<string, never>,  // Sem eventos server-to-server explícitos
+  Record<string, never>,
   SocketData
 >;
 
 export type CollabWaveServer = Server<
   ClientToServerEvents,
   ServerToClientEvents,
-  Record<string, never>,  // Sem eventos server-to-server explícitos
+  Record<string, never>,
   SocketData
 >;

@@ -1,13 +1,4 @@
-// ============================================================
-// CollabWave — Knex Configuration File
-// ============================================================
-// Este ficheiro é usado pelo CLI do Knex para correr migrações.
-// Referenciado nos scripts do package.json:
-//   "migrate": "knex migrate:latest --knexfile src/config/knexfile.ts"
-//
-// Define configurações por ambiente (development, production)
-// para que as migrações funcionem correctamente em cada contexto.
-// ============================================================
+// Config usado pelo CLI do Knex para migrations por ambiente.
 
 import type { Knex } from 'knex';
 import dotenv from 'dotenv';
@@ -15,9 +6,7 @@ import path from 'path';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
-// CONFIGURAÇÕES POR AMBIENTE
 const config: Record<string, Knex.Config> = {
-  // AMBIENTE DE DESENVOLVIMENTO
   development: {
     client: 'pg',
     connection: {
@@ -35,7 +24,6 @@ const config: Record<string, Knex.Config> = {
     debug: true,
   },
 
-  // AMBIENTE DE PRODUÇÃO
   production: {
     client: 'pg',
     connection: {
@@ -52,5 +40,4 @@ const config: Record<string, Knex.Config> = {
   },
 };
 
-// EXPORT
 module.exports = config[process.env.NODE_ENV || 'development'];

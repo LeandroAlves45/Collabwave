@@ -1,57 +1,44 @@
-// ============================================================
-// CollabWave - Global Error Handler Middleware
-// ============================================================
-// Intercepta todos os erros não tratados na aplicação e
-// devolve sempre uma resposta JSON consistente ao cliente.
-//
-// Em Express, um middleware de erro distingue-se dos outros
-// por ter QUATRO parâmetros: (err, req, res, next).
-// O Express detecta esta assinatura e usa este middleware
-// apenas quando um erro é passado via next(err).
-// ============================================================
+// Error handler global: converte erros em respostas JSON consistentes.
+// A assinatura com 4 parametros e obrigatoria para o Express.
 
 import { Request, Response, NextFunction } from 'express';
-
-// ------------------------------------------------------------
-// AppError - Classe de erro customizada
-// ------------------------------------------------------------
-// Usa-se esta classe para distinguir erros operacionais
-// (que antecipa, como "email já existe") de erros de
-// programação (bugs inesperados como referências nulas).
+import { ZodError } from 'zod';
 
 export class AppError extends Error {
-  // Código de status HTTP a devolver (e.g., 400, 404, 500)
   public readonly statusCode: number;
 
-  // Flag para indicar se é um erro operacional (vs. erro de programação)
+  // Diferencia erros esperados de bugs inesperados.
   public readonly isOperational: boolean;
 
   constructor(message: string, statusCode: number) {
-    // Chama o construtor da classe base Error
     super(message);
 
     this.statusCode = statusCode;
-    this.isOperational = true; // Por padrão, assume que é um erro operacional
+    this.isOperational = true;
 
-    // Garante que o stack trace aponta para o local onde o erro foi criado
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
-// ------------------------------------------------------------
-// errorHandler - Middleware de tratamento de erros
-// ------------------------------------------------------------
-// Este middleware deve ser adicionado APÓS todas as rotas e outros
-// middlewares. Ele captura qualquer erro passado via next(err) e
-// devolve uma resposta JSON consistente.
 export function errorHandler(
   err: Error,
   _req: Request,
   res: Response,
-  // _next é obrigatório para o Express reconhecer esta função como middleware de erro (4 parâmetros), mesmo que não seja usado
+  // Mantido para o Express reconhecer este middleware de erro.
   _next: NextFunction,
 ): void {
-  // Se o erro for uma instância de AppError, é um erro operacional
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      status: 'error',
+      message: 'Validation failed.',
+      errors: err.errors.map((e) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+    return;
+  }
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       status: 'error',
@@ -60,10 +47,9 @@ export function errorHandler(
     return;
   }
 
-  // Para erros inesperados (bugs), logamos o stack trace para diagnóstico
+  // Erros inesperados ficam no log; a resposta publica nao expõe detalhes.
   console.error('Unexpected Error:', err);
 
-  // Em desenvolvimento, incluímos a stack trace na resposta para facilitar o debug
   const message =
     process.env.NODE_ENV === 'development'
       ? err.message
