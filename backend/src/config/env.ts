@@ -30,7 +30,7 @@ export const env = {
   NODE_ENV: getOptionalEnv('NODE_ENV', 'development'),
 
   // Porta HTTP usada pelo servidor Express.
-  PORT: parseInt(getOptionalEnv('PORT', '3000'), 10),
+  PORT: parseInt(getOptionalEnv('PORT', '3001'), 10),
 
   // URLs de infraestrutura obrigatorias: sem banco ou Redis a API nao deve
   // iniciar em modo normal.

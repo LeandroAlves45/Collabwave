@@ -144,7 +144,7 @@ interface AuthResponse {
    ├─ setError(null) → limpa erro anterior
    ↓
 5. ApiClient.login({ email, password })
-   ├─ POST http://localhost:3000/api/auth/login
+   ├─ POST http://localhost:3001/api/auth/login
    ├─ Headers: { Content-Type: application/json }
    ├─ Body: { email, password }
    ↓

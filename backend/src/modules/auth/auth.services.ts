@@ -126,7 +126,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
 // Valida o refresh token, invalida o antigo e emite um novo par.
 export async function refresh(
   token: string,
-): Promise<{ accessToken: string; refreshToken: string }> {
+): Promise<AuthResponse> {
   let decoded: JwtRefreshPayload;
 
   try {
@@ -159,6 +159,7 @@ export async function refresh(
   await storeRefreshToken(newDecoded.jti, user.id);
 
   return {
+    user: sanitizeUser(user),
     accessToken,
     refreshToken: newRefreshToken,
   };

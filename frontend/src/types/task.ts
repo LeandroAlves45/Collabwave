@@ -40,7 +40,7 @@ export interface CreateTaskPayload {
   dueDate?: string // Data de vencimento da task (opcional)
 }
 
-// Payload para PATC /api/tasks/:taskId para atualizar uma task existente
+// Payload para PATCH /api/tasks/:taskId para atualizar uma task existente
 export interface UpdateTaskPayload {
   title?: string // Título da task (opcional)
   description?: string // Descrição da task (opcional)
