@@ -45,3 +45,5 @@ Desktop.ini
 *.tsbuildinfo
 .eslintcache
 .npm/
+
+.qodo/
