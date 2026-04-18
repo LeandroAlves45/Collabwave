@@ -1,24 +1,48 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import { fileURLToPath } from "node:url";
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './tests/setup.ts',
+    include: [
+      'src/**/*.test.ts',
+      'src/**/*.test.tsx',
+      'tests/**/*.test.ts',
+      'tests/**/*.test.tsx',
+      'tests/**/*.spec.ts',
+    ],
+    exclude: ['node_modules/', 'dist/'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: ['node_modules/', 'dist/', 'src/**/*.d.ts'],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
+    },
+  },
   resolve: {
     /* Alias para imports mais limpos, ex: import Button from @components/ */
     alias: {
-      '@': fileURLToPath(new URL("./src", import.meta.url)),
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
     port: 5173,
     proxy: {
-      "/api": {
-        target: "http://localhost:3001",
+      '/api': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      "/socket.io": {
-        target: "http://localhost:3001",
+      '/socket.io': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
         ws: true,
       },
@@ -26,6 +50,6 @@ export default defineConfig({
   },
 
   build: {
-    outDir: "dist",
+    outDir: 'dist',
   },
-});
+})
