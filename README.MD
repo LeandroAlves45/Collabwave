@@ -1,427 +1,436 @@
 # CollabWave
 
-> Real-time collaborative task management SaaS — built as a portfolio project
-> demonstrating WebSocket architecture, Redis pub/sub, and JWT authentication
-> in a production-grade full-stack application.
+> Real-time collaborative workspace and Kanban board application built with React, Express, PostgreSQL, Redis and Socket.io.
 
-![CI](https://github.com/LeandroAlves45/collabwave/actions/workflows/ci.yml/badge.svg)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Status](https://img.shields.io/badge/status-in%20development-orange)
-![Node](https://img.shields.io/badge/node-20.x-green)
+![Node](https://img.shields.io/badge/node-%3E%3D20-green)
+![TypeScript](https://img.shields.io/badge/typescript-5.x-blue)
+![React](https://img.shields.io/badge/react-19-61dafb)
+![Express](https://img.shields.io/badge/express-5-black)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
----
-
-## Table of Contents
-
-- [CollabWave](#collabwave)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Features](#features)
-  - [Architecture](#architecture)
-  - [Tech Stack](#tech-stack)
-    - [Backend](#backend)
-    - [Frontend](#frontend)
-    - [Infrastructure](#infrastructure)
-  - [Project Structure](#project-structure)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-    - [Local Setup (Docker Compose)](#local-setup-docker-compose)
-    - [Running Migrations](#running-migrations)
-    - [Running Tests](#running-tests)
-  - [Environment Variables](#environment-variables)
-  - [API Reference](#api-reference)
-  - [WebSocket Events](#websocket-events)
-    - [Client → Server](#client--server)
-    - [Server → Client](#server--client)
-  - [Database Schema](#database-schema)
-  - [Testing](#testing)
-  - [Sprint Plan](#sprint-plan)
-  - [Deployment](#deployment)
-  - [Known Issues](#known-issues)
-    - [npm audit — devDependencies (25 moderate vulnerabilities)](#npm-audit--devdependencies-25-moderate-vulnerabilities)
-  - [Author](#author)
+CollabWave is a full-stack collaboration platform where users can create workspaces, invite other members with join codes, and manage shared Kanban boards with real-time task updates.
 
 ---
 
-## Overview
+## ✨ Highlights
 
-CollabWave enables teams to create shared workspaces, manage tasks on interactive
-Kanban boards, and see each other's activity live — without any page refresh.
-
-The platform targets small-to-medium engineering and creative teams that require
-synchronous collaboration with minimal latency.
-
-**Target delivery:** June 2026 | **Current status:** Sprint 0 — Project Setup
-
----
-
-## Features
-
-| Feature                                            | Status             |
-| -------------------------------------------------- | ------------------ |
-| JWT authentication with refresh token rotation     | Planned — Sprint 1 |
-| Workspace creation and invite-code based joining   | Planned — Sprint 1 |
-| Role-based access control (Owner / Admin / Member) | Planned — Sprint 1 |
-| Kanban board with draggable task cards             | Planned — Sprint 5 |
-| Real-time task sync across all connected clients   | Planned — Sprint 3 |
-| Live user presence (online indicators + cursors)   | Planned — Sprint 6 |
-| In-app notification system                         | Planned — Sprint 6 |
-| Workspace activity log                             | Planned — Sprint 3 |
-| Full OpenAPI / Swagger documentation               | Planned — Sprint 8 |
-| Docker Compose single-command setup                | Planned — Sprint 1 |
+- 🔐 JWT authentication with access tokens and refresh token rotation
+- 🧑‍🤝‍🧑 Workspace membership with `owner`, `admin` and `member` roles
+- 🔗 Invite-code based workspace sharing
+- 📋 Kanban boards with columns and draggable task cards
+- ⚡ Real-time task synchronization through Socket.io
+- 🟢 Workspace presence layer backed by Redis
+- 🧪 Unit, integration and E2E test coverage
+- 🐳 Docker Compose setup for PostgreSQL, Redis and backend services
+- 🎨 React + Vite frontend with Zustand state management
 
 ---
 
-## Architecture
+## 📚 Table of Contents
 
-CollabWave follows a layered architecture with a clear separation between the
-REST API layer and the WebSocket layer. Both services share the same PostgreSQL
-database and communicate asynchronously through a Redis pub/sub channel.
-
-```
-┌─────────────────────────────────────────────────┐
-│                    CLIENT                        │
-│          React 18 + Zustand + Socket.io          │
-└──────────────────────┬──────────────────────────┘
-                       │ HTTPS / WSS
-┌──────────────────────▼──────────────────────────┐
-│                    NGINX                         │
-│         Reverse Proxy + SSL Termination          │
-│   /api/* → Express    /socket.io/* → Socket.io  │
-└──────────┬───────────────────────┬──────────────┘
-           │                       │
-┌──────────▼──────────┐ ┌─────────▼──────────────┐
-│    REST API          │ │   WebSocket Server      │
-│  Express 5           │ │   Socket.io v4          │
-│  JWT middleware      │ │   JWT handshake auth    │
-│  Rate limiting       │ │   Workspace rooms       │
-└──────────┬───────────┘ └─────────┬──────────────┘
-           │                       │
-           └───────────┬───────────┘
-                       │
-          ┌────────────▼────────────┐
-          │       PostgreSQL 15     │
-          │    Primary data store   │
-          └─────────────────────────┘
-                       │
-          ┌────────────▼────────────┐
-          │         Redis 7         │
-          │  Pub/Sub + Presence     │
-          └─────────────────────────┘
-```
+- [Tech Stack](#-tech-stack)
+- [Architecture](#-architecture)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [Available Scripts](#-available-scripts)
+- [Testing](#-testing)
+- [Core API Routes](#-core-api-routes)
+- [WebSocket Events](#-websocket-events)
+- [Product Flow](#-product-flow)
+- [Documentation](#-documentation)
+- [Author](#-author)
 
 ---
 
-## Tech Stack
-
-### Backend
-
-| Technology              | Version | Purpose                        |
-| ----------------------- | ------- | ------------------------------ |
-| Node.js                 | 20.x    | Runtime                        |
-| Express                 | 5.x     | REST API framework             |
-| Socket.io               | 4.x     | WebSocket server               |
-| socket.io-redis-adapter | latest  | Horizontal WS scaling          |
-| Knex.js                 | latest  | SQL query builder + migrations |
-| jsonwebtoken            | latest  | JWT signing and verification   |
-| bcrypt                  | latest  | Password hashing               |
+## 🧰 Tech Stack
 
 ### Frontend
 
-| Technology       | Version | Purpose                 |
-| ---------------- | ------- | ----------------------- |
-| React            | 18.x    | UI framework            |
-| TypeScript       | 5.x     | Type safety             |
-| Vite             | 5.x     | Build tool + dev server |
-| Zustand          | latest  | Client state management |
-| Socket.io-client | 4.x     | WebSocket client        |
-| React Router     | 6.x     | Client-side routing     |
-| dnd-kit          | latest  | Drag-and-drop           |
-| Tailwind CSS     | 3.x     | Utility-first styling   |
+| Technology | Purpose |
+| --- | --- |
+| React 19 | User interface |
+| TypeScript | Type-safe frontend development |
+| Vite | Dev server and production build |
+| React Router | Client-side routing |
+| Zustand | Global client state |
+| React Hook Form + Zod | Forms and validation |
+| Socket.io Client | Real-time communication |
+| Tailwind CSS | Styling system |
+| Playwright | End-to-end tests |
+| Vitest + Testing Library | Unit and integration tests |
+
+### Backend
+
+| Technology | Purpose |
+| --- | --- |
+| Node.js | JavaScript runtime |
+| Express 5 | REST API |
+| TypeScript | Type-safe backend development |
+| PostgreSQL | Relational data store |
+| Knex | Query builder and migrations |
+| Redis | Refresh token storage, presence and Socket.io adapter |
+| Socket.io | WebSocket server |
+| JWT | Authentication |
+| bcryptjs | Password hashing |
+| Zod | Request validation |
+| Jest + Supertest | Unit and integration tests |
 
 ### Infrastructure
 
-| Technology                  | Purpose                     |
-| --------------------------- | --------------------------- |
-| PostgreSQL 15               | Primary relational database |
-| Redis 7                     | Pub/sub + presence state    |
-| Docker + Docker Compose     | Containerisation            |
-| Nginx                       | Reverse proxy + SSL         |
-| GitHub Actions              | CI/CD pipeline              |
-| AWS EC2 + RDS + ElastiCache | Production deployment       |
+| Technology | Purpose |
+| --- | --- |
+| Docker Compose | Local service orchestration |
+| PostgreSQL 15 | Database container |
+| Redis 7 | Cache/pub-sub container |
+| GitHub Actions | CI pipeline |
 
 ---
 
-## Project Structure
+## 🏗️ Architecture
 
+CollabWave uses a modular full-stack architecture:
+
+```text
+React + Vite Client
+        |
+        | REST / Socket.io
+        v
+Express API + Socket.io Server
+        |
+        | SQL
+        v
+PostgreSQL
+        |
+        | token storage, pub/sub, presence
+        v
+Redis
 ```
-collabwave/
-├── .github/
-│   └── workflows/
-│       └── ci.yml              # GitHub Actions CI pipeline
+
+The backend exposes REST endpoints for persistent operations such as authentication, workspace management, columns and tasks. Socket.io is used for real-time collaboration events such as task creation, updates, moves and deletes.
+
+---
+
+## 📁 Project Structure
+
+```text
+CollabWave/
 ├── backend/
+│   ├── migrations/              # Knex database migrations
 │   ├── src/
-│   │   ├── config/             # Environment config, DB and Redis setup
-│   │   ├── middleware/         # Auth, error handling, rate limiting
+│   │   ├── config/              # Environment, database and Redis setup
+│   │   ├── middleware/          # Auth and error handling
 │   │   ├── modules/
-│   │   │   ├── auth/           # Register, login, refresh, logout
-│   │   │   ├── workspaces/     # Workspace CRUD + membership
-│   │   │   └── tasks/          # Task CRUD + column management
-│   │   ├── sockets/            # Socket.io server + event handlers
-│   │   └── app.ts              # Express app setup
-│   ├── migrations/             # Knex database migrations
-│   ├── tests/                  # Jest integration + unit tests
-│   └── Dockerfile
+│   │   │   ├── auth/            # Register, login, refresh and logout
+│   │   │   ├── columns/         # Kanban columns
+│   │   │   ├── tasks/           # Task CRUD and movement
+│   │   │   └── workspaces/      # Workspace creation, invite codes and members
+│   │   ├── sockets/             # Socket.io server and handlers
+│   │   ├── utils/               # Shared backend utilities
+│   │   ├── app.ts               # Express application
+│   │   └── server.ts            # HTTP + Socket.io bootstrap
+│   └── tests/                   # Backend unit and integration tests
 ├── frontend/
 │   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   ├── pages/              # Route-level page components
-│   │   ├── stores/             # Zustand state stores
-│   │   ├── hooks/              # Custom React hooks
-│   │   ├── services/           # API and Socket.io client wrappers
-│   │   └── types/              # Shared TypeScript type definitions
-│   └── Dockerfile
-├── nginx/
-│   └── nginx.conf              # Nginx reverse proxy configuration
-├── docker-compose.yml          # Local development environment
-├── docker-compose.prod.yml     # Production environment
-├── .env.example                # Environment variables template
-├── .gitignore
-└── README.md
+│   │   ├── components/          # Shared UI and product components
+│   │   ├── hooks/               # Custom React hooks
+│   │   ├── pages/               # Login, register, workspaces and board pages
+│   │   ├── schemas/             # Zod frontend validation
+│   │   ├── services/            # API and Socket.io clients
+│   │   ├── stores/              # Zustand stores
+│   │   ├── styles/              # Global styles
+│   │   └── types/               # Frontend TypeScript types
+│   └── tests/
+│       ├── E2E/                 # Playwright tests
+│       ├── integration/         # Component/page integration tests
+│       └── unit/                # Unit tests
+├── docs/                        # Project notes, testing plans and analysis
+├── docker-compose.yml           # Local backend infrastructure
+├── .env.example                 # Environment variable template
+└── README.MD
 ```
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
-Make sure you have the following installed on your machine:
+Install the following tools:
 
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
-- [Node.js 20](https://nodejs.org/) (for local development without Docker)
-- [Git](https://git-scm.com/)
+- Node.js `>= 20`
+- npm `>= 10`
+- Docker and Docker Compose
+- Git
 
-### Local Setup (Docker Compose)
+### 1. Clone the repository
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/LeandroAlves45/collabwave.git
 cd collabwave
+```
 
-# 2. Create your local environment file
+### 2. Install dependencies
+
+```bash
+npm install
+npm install --prefix backend
+npm install --prefix frontend
+```
+
+### 3. Configure environment variables
+
+Create a local `.env` file:
+
+```bash
 cp .env.example .env
-
-# 3. Fill in the required values in .env
-#    At minimum: DB_PASSWORD, JWT_SECRET, JWT_REFRESH_SECRET
-#    Generate secrets: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-
-# 4. Start all services
-docker-compose up --build
-
-# The following will be available:
-#   Frontend:  http://localhost:5173
-#   Backend:   http://localhost:3001
-#   API Docs:  http://localhost:3001/api/docs
 ```
 
-### Running Migrations
+Generate secure JWT secrets:
 
 ```bash
-# Run all pending database migrations
-docker-compose exec backend npm run migrate
-
-# Rollback the last migration batch
-docker-compose exec backend npm run migrate:rollback
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ```
 
-### Running Tests
+Update `.env` with your database, Redis and JWT values.
+
+### 4. Start infrastructure and backend
+
+The Docker Compose file starts PostgreSQL, Redis and the backend API:
 
 ```bash
-# Run the full test suite with coverage report
-docker-compose exec backend npm run test:ci
-
-# Run tests in watch mode (development)
-docker-compose exec backend npm run test
+docker compose up --build
 ```
 
----
+Services:
 
-## Environment Variables
+- Backend: `http://localhost:3001`
+- Health check: `http://localhost:3001/health`
+- PostgreSQL host port: `5433`
+- Redis host port: `6379`
 
-See [`.env.example`](.env.example) for a full list of required variables with
-descriptions. Copy it to `.env` and fill in the values before starting the
-application.
+### 5. Run database migrations
 
-**Never commit your `.env` file.** It is listed in `.gitignore`.
-
----
-
-## API Reference
-
-Full API documentation is available via Swagger UI at:
-
-```
-http://localhost:3001/api/docs
-```
-
-A summary of available endpoints:
-
-| Method | Endpoint                    | Auth            | Description                  |
-| ------ | --------------------------- | --------------- | ---------------------------- |
-| POST   | `/api/auth/register`        | None            | Register a new user          |
-| POST   | `/api/auth/login`           | None            | Login and receive JWT tokens |
-| POST   | `/api/auth/refresh`         | Refresh token   | Rotate access token          |
-| POST   | `/api/auth/logout`          | Bearer          | Invalidate refresh token     |
-| GET    | `/api/workspaces`           | Bearer          | List user workspaces         |
-| POST   | `/api/workspaces`           | Bearer          | Create a workspace           |
-| POST   | `/api/workspaces/join`      | Bearer          | Join via invite code         |
-| GET    | `/api/workspaces/:id/tasks` | Bearer + Member | Fetch all tasks              |
-| POST   | `/api/workspaces/:id/tasks` | Bearer + Member | Create a task                |
-| PATCH  | `/api/tasks/:taskId/move`   | Bearer + Member | Move task to column          |
-
-See the full SDD documentation for the complete API reference.
-
----
-
-## WebSocket Events
-
-Clients connect to the Socket.io server and join a workspace room via
-`workspace:join`. All board updates are broadcast in real time.
-
-### Client → Server
-
-| Event            | Payload                                    |
-| ---------------- | ------------------------------------------ |
-| `workspace:join` | `{ workspaceId }`                          |
-| `task:create`    | `{ columnId, title, priority?, dueDate? }` |
-| `task:move`      | `{ taskId, targetColumnId, newPosition }`  |
-| `task:update`    | `{ taskId, fields }`                       |
-| `task:delete`    | `{ taskId }`                               |
-| `cursor:move`    | `{ workspaceId, x, y }`                    |
-
-### Server → Client
-
-| Event                       | Payload                                            |
-| --------------------------- | -------------------------------------------------- |
-| `workspace:presence_update` | `{ onlineUsers }`                                  |
-| `task:created`              | `{ task }`                                         |
-| `task:moved`                | `{ taskId, targetColumnId, newPosition, movedBy }` |
-| `task:deleted`              | `{ taskId, deletedBy }`                            |
-| `notification:new`          | `{ notification }`                                 |
-
----
-
-## Database Schema
-
-Core entities and their relationships:
-
-```
-users ──────────────────────────────────────────────┐
-  id (PK), name, email, password_hash, avatar_url   │
-                                                     │
-workspaces ─────────────────────────────────────────┤
-  id (PK), name, description, owner_id (FK), invite_code
-                                                     │
-workspace_members ───────────────────────────────────┤
-  workspace_id (FK), user_id (FK), role, joined_at  │
-                                                     │
-columns                                              │
-  id (PK), workspace_id (FK), title, position       │
-                                                     │
-tasks                                                │
-  id (PK), column_id (FK), title, description,      │
-  assignee_id (FK), priority, due_date, position    │
-                                                     │
-activity_log                                         │
-  id (PK), workspace_id (FK), user_id (FK),         │
-  action, metadata (JSONB), created_at              │
-└────────────────────────────────────────────────────┘
-```
-
----
-
-## Testing
-
-The project follows a testing pyramid strategy with a minimum target of 60%
-code coverage on the backend.
-
-| Type           | Tool                           | Target Coverage |
-| -------------- | ------------------------------ | --------------- |
-| Unit           | Jest + ts-jest                 | > 80%           |
-| Integration    | Jest + Supertest               | > 60%           |
-| WebSocket      | Jest + socket.io-client        | > 60%           |
-| Component      | Vitest + React Testing Library | > 50%           |
-| E2E (optional) | Playwright                     | Key flows only  |
-
----
-
-## Sprint Plan
-
-| Sprint   | Phase                                                    | Status      |
-| -------- | -------------------------------------------------------- | ----------- |
-| Sprint 0 | Project setup, ESLint, Prettier, Husky, GitHub Actions   | ✅ Complete |
-| Sprint 1 | Docker Compose, DB schema, Knex migrations, Auth API     | 🔄 Next     |
-| Sprint 2 | Socket.io server, JWT WS auth, Workspace rooms, Presence | Planned     |
-| Sprint 3 | Task Board REST API + WebSocket events                   | Planned     |
-| Sprint 4 | React shell, routing, Auth pages, Zustand stores         | Planned     |
-| Sprint 5 | Kanban board, drag-and-drop, real-time sync              | Planned     |
-| Sprint 6 | Presence bar, cursor broadcast, notifications            | Planned     |
-| Sprint 7 | Tests, CI/CD, production Docker Compose, deploy          | Planned     |
-| Sprint 8 | README, Swagger docs, portfolio write-up                 | Planned     |
-
----
-
-## Deployment
-
-The application is designed to run via a single command in any environment:
+In another terminal:
 
 ```bash
-# Local development
-docker-compose up --build
-
-# Production
-docker-compose -f docker-compose.prod.yml up -d
+npm run migrate --prefix backend
 ```
 
-**Production infrastructure:**
+### 6. Start the frontend
 
-- **Compute:** AWS EC2 t3.micro
-- **Database:** AWS RDS PostgreSQL 15
-- **Cache:** AWS ElastiCache Redis 7
-- **Reverse Proxy:** Nginx with Let's Encrypt SSL
-- **CI/CD:** GitHub Actions → Railway (staging) → AWS (production)
+```bash
+npm run dev --prefix frontend
+```
 
----
+Frontend:
 
-## Known Issues
-
-### npm audit — devDependencies (25 moderate vulnerabilities)
-
-Remaining vulnerabilities are confined exclusively to the test runner toolchain
-(`ts-jest` → `jest` dependency chain) and are never present in production builds.
-
-| Package           | Affected via                 | Production risk         | Status     |
-| ----------------- | ---------------------------- | ----------------------- | ---------- |
-| `brace-expansion` | `ts-jest` → `jest` toolchain | None — test runner only | Monitoring |
-
-**Why not fixed:** The available fix requires a breaking downgrade of `jest`
-to v25, which is incompatible with the current test configuration.
-These will be resolved when the upstream packages update their dependency ranges.
-
-**Production dependencies are clean** — verified via `npm audit --omit=dev`.
+```text
+http://localhost:5173
+```
 
 ---
 
-## Author
+## 🔐 Environment Variables
 
-**Leandro Alves**
-Junior Full Stack Developer — Maia, Porto, Portugal
+The main environment variables are:
+
+| Variable | Description |
+| --- | --- |
+| `PORT` | Backend HTTP port, usually `3001` |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_SECRET` | Access token signing secret |
+| `JWT_REFRESH_SECRET` | Refresh token signing secret |
+| `JWT_EXPIRES_IN` | Access token lifetime |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime |
+| `CORS_ORIGIN` | Allowed frontend origin |
+| `VITE_API_URL` | Frontend REST API base URL |
+| `VITE_SOCKET_URL` | Frontend Socket.io server URL |
+| `RATE_LIMIT_WINDOW_MS` | Rate limit window |
+| `RATE_LIMIT_MAX_REQUESTS` | Max requests per rate limit window |
+
+See [`.env.example`](.env.example) for the full template.
+
+---
+
+## 🧑‍💻 Available Scripts
+
+### Root
+
+```bash
+npm run lint
+npm run lint:backend
+npm run lint:frontend
+```
+
+### Backend
+
+```bash
+npm run dev --prefix backend
+npm run build --prefix backend
+npm run start --prefix backend
+npm run migrate --prefix backend
+npm run migrate:rollback --prefix backend
+npm run test:unit --prefix backend
+npm run test:integration --prefix backend
+npm run test:ci --prefix backend
+```
+
+### Frontend
+
+```bash
+npm run dev --prefix frontend
+npm run build --prefix frontend
+npm run preview --prefix frontend
+npm run test --prefix frontend
+npm run test:e2e --prefix frontend
+npm run test:coverage --prefix frontend
+```
+
+---
+
+## 🧪 Testing
+
+CollabWave includes multiple test layers:
+
+| Layer | Tooling | Location |
+| --- | --- | --- |
+| Backend unit tests | Jest | `backend/tests/unit` |
+| Backend integration tests | Jest + Supertest | `backend/tests/integration` |
+| Frontend unit tests | Vitest | `frontend/tests/unit` |
+| Frontend integration tests | Vitest + Testing Library | `frontend/tests/integration` |
+| E2E tests | Playwright | `frontend/tests/E2E` |
+
+Run frontend E2E tests:
+
+```bash
+npm run test:e2e --prefix frontend
+```
+
+The E2E suite uses:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3001`
+
+The current E2E suite validates authentication, workspace creation/join flows, board loading, task creation, deletion, movement and real-time synchronization.
+
+---
+
+## 🌐 Core API Routes
+
+### Auth
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `POST` | `/api/auth/register` | Create a new user |
+| `POST` | `/api/auth/login` | Authenticate user |
+| `POST` | `/api/auth/refresh` | Rotate access and refresh tokens |
+| `POST` | `/api/auth/logout` | Revoke refresh token |
+
+### Workspaces
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/api/workspaces` | List workspaces for current user |
+| `POST` | `/api/workspaces` | Create workspace and default columns |
+| `POST` | `/api/workspaces/join` | Join a workspace using an invite code |
+| `GET` | `/api/workspaces/:id` | Get workspace details |
+| `GET` | `/api/workspaces/:id/members` | List workspace members |
+
+### Columns
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/api/workspaces/:workspaceId/columns` | List columns |
+| `POST` | `/api/workspaces/:workspaceId/columns` | Create column |
+| `PATCH` | `/api/columns/:columnId` | Update column title |
+| `PATCH` | `/api/columns/:columnId/reorder` | Reorder column |
+| `DELETE` | `/api/columns/:columnId` | Delete column |
+
+### Tasks
+
+| Method | Route | Description |
+| --- | --- | --- |
+| `GET` | `/api/workspaces/:workspaceId/tasks` | List task columns |
+| `POST` | `/api/workspaces/:workspaceId/tasks` | Create task |
+| `PATCH` | `/api/workspaces/:workspaceId/tasks/:taskId` | Update task |
+| `PATCH` | `/api/workspaces/:workspaceId/tasks/:taskId/move` | Move task |
+| `DELETE` | `/api/workspaces/:workspaceId/tasks/:taskId` | Delete task |
+
+---
+
+## ⚡ WebSocket Events
+
+### Client to Server
+
+| Event | Payload |
+| --- | --- |
+| `workspace:join` | `{ workspaceId }` |
+| `workspace:leave` | `{ workspaceId }` |
+| `task:create` | `{ workspaceId, columnId, title, description?, priority, dueDate? }` |
+| `task:update` | `{ taskId, fields }` |
+| `task:move` | `{ taskId, targetColumnId, newPosition }` |
+| `task:delete` | `{ taskId }` |
+
+### Server to Client
+
+| Event | Payload |
+| --- | --- |
+| `workspace:presence_update` | `{ onlineUsers }` |
+| `task:created` | `{ task }` |
+| `task:updated` | `{ task }` |
+| `task:moved` | `{ taskId, targetColumnId, newPosition, movedBy }` |
+| `task:deleted` | `{ taskId, deletedBy }` |
+| `notification:new` | `{ notification }` |
+
+---
+
+## 🧭 Product Flow
+
+1. A user registers or signs in.
+2. The user creates a workspace.
+3. The backend automatically creates default Kanban columns.
+4. The owner shares the workspace invite code.
+5. Another user joins using the invite code.
+6. Members collaborate on the same board.
+7. Task changes are synchronized in real time through Socket.io.
+
+---
+
+## 📝 Documentation
+
+Useful project documents:
+
+- [Backend endpoints](docs/Endpoints_Backend.md)
+- [Testing plan](docs/TESTING_PLAN.md)
+- [Frontend test analysis](docs/ANALISE_TESTES_FRONTEND.md)
+- [E2E update notes](docs/E2E_TESTS_UPDATE_2026-04-19.md)
+
+---
+
+## 🛡️ Security Notes
+
+- Passwords are hashed with bcrypt.
+- Access tokens are short-lived.
+- Refresh tokens are stored and revocable through Redis.
+- Protected routes require JWT authentication.
+- Workspace, column and task actions validate membership.
+- CORS is restricted by `CORS_ORIGIN`.
+- Express rate limiting is enabled for API protection.
+
+---
+
+## 🧑‍🚀 Author
+
+**Leandro Alves**  
+Full Stack Developer
 
 - GitHub: [@LeandroAlves45](https://github.com/LeandroAlves45)
 
 ---
 
-_This project is part of my development portfolio, built to demonstrate
-production-grade full-stack architecture with real-time capabilities._
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
