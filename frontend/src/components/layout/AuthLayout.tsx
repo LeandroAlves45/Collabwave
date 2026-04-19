@@ -4,17 +4,13 @@
 
 import type { ReactElement } from 'react'
 import { Outlet } from 'react-router-dom'
-import { Logo } from '@/components/common/Logo'
 
-// Layout para as páginas públicas de autenticação (login, register)
-// Centra o contéudo na viewport e mostra o logo da aplicação
+// Layout para as páginas públicas de autenticação (login, register).
+// As páginas controlam o seu próprio alinhamento e conteúdo visual.
 export function AuthLayout(): ReactElement {
   return (
-    <div className="min-h-screen bg-cw-base flex flex-col items-center justify-center px-4">
-      <div className="mb-8">
-        <Logo size="md" />
-      </div>
-
+    // Wrapper minimo: login/register controlam card, logo e alinhamento de forma independente.
+    <div className="min-h-screen bg-cw-bg-primary">
       <Outlet />
     </div>
   )

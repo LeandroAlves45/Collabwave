@@ -7,6 +7,7 @@ import {
   reorderColumnSchema,
 } from './column.validators.js';
 import * as columnService from './column.service.js';
+import type { Column } from './column.types.js';
 
 function asyncHandler(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
@@ -16,10 +17,37 @@ function asyncHandler(
   };
 }
 
+// Converte snake_case da BD para camelCase da API
+function toApiFormat(column: Column) {
+  return {
+    id: column.id,
+    workspaceId: column.workspace_id,
+    title: column.title,
+    position: column.position,
+  };
+}
+
+export const getColumnsForWorkspace = asyncHandler(
+  async (req: Request, res: Response) => {
+    const workspaceId = req.params.workspaceId as string;
+    const userId = req.user!.id;
+
+    const columns = await columnService.getColumnsForWorkspace(
+      workspaceId,
+      userId,
+    );
+
+    res.status(200).json({
+      success: true,
+      data: columns.map(toApiFormat),
+    });
+  },
+);
+
 export const createColumn = asyncHandler(
   async (req: Request, res: Response) => {
     const validatedBody = createColumnSchema.parse(req.body);
-    const workspaceId = req.params.id as string;
+    const workspaceId = req.params.workspaceId as string;
     const userId = req.user!.id;
 
     const column = await columnService.createColumn(
@@ -30,7 +58,7 @@ export const createColumn = asyncHandler(
 
     res.status(201).json({
       success: true,
-      data: column,
+      data: toApiFormat(column),
     });
   },
 );
@@ -49,7 +77,7 @@ export const updateColumn = asyncHandler(
 
     res.status(200).json({
       success: true,
-      data: column,
+      data: toApiFormat(column),
     });
   },
 );
@@ -79,7 +107,7 @@ export const reorderColumn = asyncHandler(
 
     res.status(200).json({
       success: true,
-      data: column,
+      data: toApiFormat(column),
     });
   },
 );

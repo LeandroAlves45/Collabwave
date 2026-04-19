@@ -11,6 +11,10 @@ import type {
 } from '@/types/workspace'
 import type {
   Task,
+  TaskWithUsers,
+  UserInfo,
+  Column,
+  ColumnWithTasks,
   CreateTaskPayload,
   UpdateTaskPayload,
   MoveTaskPayload,
@@ -26,9 +30,12 @@ const API_BASE_URL =
 // Todos os endpoints retornam: { status, data: T, message? }
 interface ApiResponse<T> {
   status: 'success' | 'error'
+  success?: boolean
   data: T
   message?: string
 }
+
+type RawRecord = Record<string, unknown>
 
 /**
  * Classe com métodos estáticos para requisições HTTP autenticadas.
@@ -36,6 +43,97 @@ interface ApiResponse<T> {
  * Todos os endpoints requerem access token (excepto auth/login e auth/register).
  */
 class ApiClient {
+  private static normalizeWorkspace<T extends RawRecord>(
+    workspace: T,
+    fallbackRole?: string
+  ): Workspace & { role: string } {
+    return {
+      id: String(workspace.id),
+      name: String(workspace.name),
+      description:
+        typeof workspace.description === 'string' ? workspace.description : undefined,
+      ownerId: String(workspace.ownerId ?? workspace.owner_id ?? ''),
+      inviteCode: String(workspace.inviteCode ?? workspace.invite_code ?? ''),
+      createdAt: String(workspace.createdAt ?? workspace.created_at ?? ''),
+      role: String(workspace.role ?? fallbackRole ?? 'member'),
+    }
+  }
+
+  private static normalizeColumn(column: RawRecord): Column {
+    return {
+      id: String(column.id),
+      workspaceId: String(column.workspaceId ?? column.workspace_id ?? ''),
+      title: String(column.title),
+      position: Number(column.position ?? 0),
+    }
+  }
+
+  private static normalizeUserInfo(value: unknown): UserInfo | undefined {
+    if (!value || typeof value !== 'object') return undefined
+
+    const user = value as RawRecord
+    if (
+      typeof user.id !== 'string' ||
+      typeof user.name !== 'string' ||
+      typeof user.initials !== 'string'
+    ) {
+      return undefined
+    }
+
+    return {
+      id: user.id,
+      name: user.name,
+      initials: user.initials,
+    }
+  }
+
+  private static normalizeTask(task: RawRecord): Task | TaskWithUsers {
+    const normalized: Task = {
+      id: String(task.id),
+      columnId: String(task.columnId ?? task.column_id ?? ''),
+      title: String(task.title),
+      description:
+        typeof task.description === 'string' ? task.description : undefined,
+      assigneeId:
+        typeof (task.assigneeId ?? task.assignee_id) === 'string'
+          ? String(task.assigneeId ?? task.assignee_id)
+          : undefined,
+      priority:
+        task.priority === 'low' ||
+        task.priority === 'medium' ||
+        task.priority === 'high' ||
+        task.priority === 'urgent'
+          ? task.priority
+          : 'medium',
+      dueDate:
+        typeof (task.dueDate ?? task.due_date) === 'string'
+          ? String(task.dueDate ?? task.due_date)
+          : undefined,
+      position: Number(task.position ?? 0),
+      createdAt: String(task.createdAt ?? task.created_at ?? ''),
+      updatedAt: String(task.updatedAt ?? task.updated_at ?? ''),
+    }
+
+    const createdBy = this.normalizeUserInfo(task.createdBy)
+    if (!createdBy) return normalized
+
+    const assignee = this.normalizeUserInfo(task.assignee)
+    return {
+      ...normalized,
+      createdBy,
+      ...(assignee ? { assignee } : {}),
+    }
+  }
+
+  private static normalizeColumnWithTasks(column: RawRecord): ColumnWithTasks {
+    const tasks = Array.isArray(column.tasks) ? column.tasks : []
+
+    return {
+      ...this.normalizeColumn(column),
+      tasks: tasks.map((task) => this.normalizeTask(task as RawRecord)),
+    }
+  }
+
   /**
    * Método auxiliar privado para fazer requisições HTTP.
    * Adiciona automaticamente:
@@ -75,6 +173,11 @@ class ApiClient {
         headers,
         body: body ? JSON.stringify(body) : undefined,
       })
+
+      // 204 No Content não tem body, retorna void sem parsing
+      if (response.status === 204) {
+        return undefined as T
+      }
 
       // Parse a resposta JSON com tipo genérico
       const result: ApiResponse<T> = await response.json()
@@ -181,12 +284,14 @@ class ApiClient {
    * @throws Error se falhar (ex: token inválido)
    */
   static async listWorkspaces(): Promise<Array<Workspace & { role: string }>> {
-    return this.request<Array<Workspace & { role: string }>>(
+    const workspaces = await this.request<RawRecord[]>(
       '/workspaces',
       'GET',
       undefined,
       this.getToken()
     )
+
+    return workspaces.map((workspace) => this.normalizeWorkspace(workspace))
   }
 
   /**
@@ -201,12 +306,14 @@ class ApiClient {
   static async createWorkspace(
     payload: CreateWorkspacePayload
   ): Promise<Workspace & { role: string }> {
-    return this.request<Workspace & { role: string }>(
+    const workspace = await this.request<RawRecord>(
       '/workspaces',
       'POST',
       payload,
       this.getToken()
     )
+
+    return this.normalizeWorkspace(workspace, 'owner')
   }
 
   /**
@@ -221,12 +328,14 @@ class ApiClient {
   static async joinWorkspace(
     payload: JoinWorkspacePayload
   ): Promise<Workspace & { role: string }> {
-    return this.request<Workspace & { role: string }>(
+    const workspace = await this.request<RawRecord>(
       '/workspaces/join',
       'POST',
       payload,
       this.getToken()
     )
+
+    return this.normalizeWorkspace(workspace, 'member')
   }
 
   /**
@@ -250,6 +359,49 @@ class ApiClient {
   // ========== TASKS ==========
 
   /**
+   * GET /workspaces/:id/columns
+   * Lista todas as colunas de um workspace.
+   * Retorna colunas com seus títulos e posições.
+   *
+   * @param workspaceId - ID do workspace
+   * @returns Array de colunas do workspace
+   * @throws Error se workspace não existir ou acesso negado
+   */
+  static async getColumns(workspaceId: string): Promise<Column[]> {
+    const columns = await this.request<RawRecord[]>(
+      `/workspaces/${workspaceId}/columns`,
+      'GET',
+      undefined,
+      this.getToken()
+    )
+
+    return columns.map((column) => this.normalizeColumn(column))
+  }
+
+  static async createColumn(
+    workspaceId: string,
+    payload: { title: string }
+  ): Promise<Column> {
+    const column = await this.request<RawRecord>(
+      `/workspaces/${workspaceId}/columns`,
+      'POST',
+      payload,
+      this.getToken()
+    )
+
+    return this.normalizeColumn(column)
+  }
+
+  static async deleteColumn(workspaceId: string, columnId: string): Promise<void> {
+    await this.request<void>(
+      `/workspaces/${workspaceId}/columns/${columnId}`,
+      'DELETE',
+      undefined,
+      this.getToken()
+    )
+  }
+
+  /**
    * GET /workspaces/:id/tasks
    * Lista todas as tasks de um workspace.
    * Retorna task organizadas por coluna
@@ -258,13 +410,21 @@ class ApiClient {
    * @returns Array de tasks organizadas por coluna
    * @throws Error se workspace não existir ou acesso negado
    */
-  static async listTasks(workspaceId: string): Promise<Task[]> {
-    return this.request<Task[]>(
+  static async listTaskColumns(workspaceId: string): Promise<ColumnWithTasks[]> {
+    const columns = await this.request<RawRecord[]>(
       `/workspaces/${workspaceId}/tasks`,
       'GET',
       undefined,
       this.getToken()
     )
+
+    return columns.map((column) => this.normalizeColumnWithTasks(column))
+  }
+
+  static async listTasks(workspaceId: string): Promise<(Task | TaskWithUsers)[]> {
+    const columns = await this.listTaskColumns(workspaceId)
+
+    return columns.flatMap((column) => column.tasks)
   }
 
   /**
@@ -280,13 +440,15 @@ class ApiClient {
   static async createTask(
     workspaceId: string,
     payload: CreateTaskPayload
-  ): Promise<Task> {
-    return this.request<Task>(
+  ): Promise<Task | TaskWithUsers> {
+    const task = await this.request<RawRecord>(
       `/workspaces/${workspaceId}/tasks`,
       'POST',
       payload,
       this.getToken()
     )
+
+    return this.normalizeTask(task)
   }
 
   /**
@@ -304,13 +466,15 @@ class ApiClient {
     workspaceId: string,
     taskId: string,
     payload: UpdateTaskPayload
-  ): Promise<Task> {
-    return this.request<Task>(
+  ): Promise<Task | TaskWithUsers> {
+    const task = await this.request<RawRecord>(
       `/workspaces/${workspaceId}/tasks/${taskId}`,
       'PATCH',
       payload,
       this.getToken()
     )
+
+    return this.normalizeTask(task)
   }
 
   /**
@@ -329,12 +493,14 @@ class ApiClient {
     taskId: string,
     payload: MoveTaskPayload
   ): Promise<Task> {
-    return this.request<Task>(
+    const task = await this.request<RawRecord>(
       `/workspaces/${workspaceId}/tasks/${taskId}/move`,
       'PATCH',
       payload,
       this.getToken()
     )
+
+    return this.normalizeTask(task)
   }
 
   /**

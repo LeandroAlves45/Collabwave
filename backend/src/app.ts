@@ -18,6 +18,13 @@ import columnRouter, {
 
 const app = express();
 
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Rate limit global para mitigar abuso basico por IP.
 const limiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
@@ -47,20 +54,14 @@ app.use(
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false }));
 
-app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-  });
-});
-
 // Rotas HTTP.
 app.use('/api/auth', authRoutes);
 
-app.use('/api/workspaces', workspaceRoutes);
+// Rotas com sub-paths devem vir ANTES das rotas genéricas /:id
 app.use('/api/workspaces', workspaceScopedTaskRoutes);
-app.use('/api/tasks', taskRouter);
 app.use('/api/workspaces', workspaceScopedColumnRoutes);
+app.use('/api/workspaces', workspaceRoutes);
+app.use('/api/tasks', taskRouter);
 app.use('/api/columns', columnRouter);
 
 // Deve ser o ultimo middleware para capturar erros das rotas anteriores.

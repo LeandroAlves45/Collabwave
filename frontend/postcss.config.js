@@ -2,8 +2,8 @@
 export default {
   plugins: {
     /* Processa @tailwind directives e converte para CSS */
-    tailwindcss: {},
+    '@tailwindcss/postcss': {},
     /* Adiciona vendor prefixes automaticamente (ex: -webkit-, -moz-) */
     autoprefixer: {},
   },
-};
+}

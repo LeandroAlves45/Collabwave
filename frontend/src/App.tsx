@@ -5,7 +5,7 @@ import { AuthLayout } from "./components/layout/AuthLayout";
 import { RootLayout } from "./components/layout/RootLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
-import { WorkspacePage } from "./pages/WorkspacesPage";
+import { WorkspacesPage } from "./pages/WorkspacesPage";
 import { BoardPage } from "./pages/BoardPage";
 
 // ProtectedRoute é uma layout route sem path
@@ -34,7 +34,7 @@ export function App(): ReactElement {
         {/* Rotas protegidas: RootLayout fornece o shell, ProtectedRoute verifica auth */}
         <Route element={<ProtectedRoute />}>
           <Route element={<RootLayout />}>
-            <Route path="/" element={<WorkspacePage />} />
+            <Route path="/" element={<WorkspacesPage />} />
             <Route path="/board/:id" element={<BoardPage />} />
           </Route>
         </Route>

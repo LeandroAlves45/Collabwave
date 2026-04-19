@@ -8,7 +8,7 @@
 //   addUserToPresence        → SADD + EXPIRE com chave correcta
 //   removeUserFromPresence   → SREM com chave correcta
 //   getOnlineUsers           → SMEMBERS + query BD; caso vazio
-//   removeUserFromAllWorkspaces → KEYS + SISMEMBER + SREM; devolve ids afectados
+//   removeUserFromAllWorkspaces → SCAN + SISMEMBER + SREM; devolve ids afectados
 // ============================================================
 
 jest.mock('../../src/config/redis.js');
@@ -24,7 +24,7 @@ const mockRedis = redisClient as unknown as {
   srem: jest.Mock;
   smembers: jest.Mock;
   expire: jest.Mock;
-  keys: jest.Mock;
+  scan: jest.Mock;
   sismember: jest.Mock;
 };
 
@@ -37,7 +37,7 @@ beforeEach(() => {
   mockRedis.srem = jest.fn().mockResolvedValue(1);
   mockRedis.smembers = jest.fn().mockResolvedValue([]);
   mockRedis.expire = jest.fn().mockResolvedValue(1);
-  mockRedis.keys = jest.fn().mockResolvedValue([]);
+  mockRedis.scan = jest.fn().mockResolvedValue(['0', []]);
   mockRedis.sismember = jest.fn().mockResolvedValue(0);
 });
 
@@ -45,24 +45,35 @@ beforeEach(() => {
 // SUITE: addUserToPresence
 // ----------------------------------------------------------------
 describe('addUserToPresence', () => {
-  it('calls SADD with the correct presence key and userId', async () => {
-    await presenceService.addUserToPresence('ws-1', 'user-1');
+  it('calls SADD with the correct presence key and socket-scoped member', async () => {
+    await presenceService.addUserToPresence('ws-1', 'user-1', 'socket-1');
 
-    expect(mockRedis.sadd).toHaveBeenCalledWith('presence:ws-1', 'user-1');
+    expect(mockRedis.sadd).toHaveBeenCalledWith(
+      'presence:ws-1',
+      'user-1:socket-1',
+    );
   });
 
   it('calls EXPIRE on the same key after SADD to renew TTL', async () => {
-    await presenceService.addUserToPresence('ws-1', 'user-1');
+    await presenceService.addUserToPresence('ws-1', 'user-1', 'socket-1');
 
     expect(mockRedis.expire).toHaveBeenCalledWith('presence:ws-1', 86400);
   });
 
   it('uses distinct keys for different workspaces', async () => {
-    await presenceService.addUserToPresence('ws-A', 'user-1');
-    await presenceService.addUserToPresence('ws-B', 'user-1');
+    await presenceService.addUserToPresence('ws-A', 'user-1', 'socket-1');
+    await presenceService.addUserToPresence('ws-B', 'user-1', 'socket-1');
 
-    expect(mockRedis.sadd).toHaveBeenNthCalledWith(1, 'presence:ws-A', 'user-1');
-    expect(mockRedis.sadd).toHaveBeenNthCalledWith(2, 'presence:ws-B', 'user-1');
+    expect(mockRedis.sadd).toHaveBeenNthCalledWith(
+      1,
+      'presence:ws-A',
+      'user-1:socket-1',
+    );
+    expect(mockRedis.sadd).toHaveBeenNthCalledWith(
+      2,
+      'presence:ws-B',
+      'user-1:socket-1',
+    );
   });
 });
 
@@ -70,14 +81,17 @@ describe('addUserToPresence', () => {
 // SUITE: removeUserFromPresence
 // ----------------------------------------------------------------
 describe('removeUserFromPresence', () => {
-  it('calls SREM with the correct presence key and userId', async () => {
-    await presenceService.removeUserFromPresence('ws-1', 'user-1');
+  it('calls SREM with the correct presence key and socket-scoped member', async () => {
+    await presenceService.removeUserFromPresence('ws-1', 'user-1', 'socket-1');
 
-    expect(mockRedis.srem).toHaveBeenCalledWith('presence:ws-1', 'user-1');
+    expect(mockRedis.srem).toHaveBeenCalledWith(
+      'presence:ws-1',
+      'user-1:socket-1',
+    );
   });
 
   it('does not call SADD or EXPIRE', async () => {
-    await presenceService.removeUserFromPresence('ws-1', 'user-1');
+    await presenceService.removeUserFromPresence('ws-1', 'user-1', 'socket-1');
 
     expect(mockRedis.sadd).not.toHaveBeenCalled();
     expect(mockRedis.expire).not.toHaveBeenCalled();
@@ -99,7 +113,11 @@ describe('getOnlineUsers', () => {
   });
 
   it('queries the database with the userIds from Redis', async () => {
-    mockRedis.smembers.mockResolvedValue(['user-1', 'user-2']);
+    mockRedis.smembers.mockResolvedValue([
+      'user-1:socket-1',
+      'user-1:socket-2',
+      'user-2:socket-3',
+    ]);
 
     const users = [
       { id: 'user-1', email: 'a@test.com', name: 'Alice' },
@@ -133,41 +151,55 @@ describe('getOnlineUsers', () => {
 // ----------------------------------------------------------------
 describe('removeUserFromAllWorkspaces', () => {
   it('returns empty array when there are no presence keys', async () => {
-    mockRedis.keys.mockResolvedValue([]);
+    mockRedis.scan.mockResolvedValue(['0', []]);
 
-    const result = await presenceService.removeUserFromAllWorkspaces('user-1');
+    const result = await presenceService.removeUserFromAllWorkspaces(
+      'user-1',
+      'socket-1',
+    );
 
     expect(result).toEqual([]);
     expect(mockRedis.srem).not.toHaveBeenCalled();
   });
 
   it('scans using the correct key pattern', async () => {
-    mockRedis.keys.mockResolvedValue([]);
+    mockRedis.scan.mockResolvedValue(['0', []]);
 
-    await presenceService.removeUserFromAllWorkspaces('user-1');
+    await presenceService.removeUserFromAllWorkspaces('user-1', 'socket-1');
 
-    expect(mockRedis.keys).toHaveBeenCalledWith('presence:*');
+    expect(mockRedis.scan).toHaveBeenCalledWith(
+      '0',
+      'MATCH',
+      'presence:*',
+      'COUNT',
+      100,
+    );
   });
 
   it('removes user only from workspaces where they are a member', async () => {
-    mockRedis.keys.mockResolvedValue(['presence:ws-1', 'presence:ws-2']);
+    mockRedis.scan.mockResolvedValue(['0', ['presence:ws-1', 'presence:ws-2']]);
     // user-1 está em ws-1 mas não em ws-2
     mockRedis.sismember
       .mockResolvedValueOnce(1) // ws-1 → é membro
       .mockResolvedValueOnce(0); // ws-2 → não é membro
 
-    const result = await presenceService.removeUserFromAllWorkspaces('user-1');
+    const result = await presenceService.removeUserFromAllWorkspaces(
+      'user-1',
+      'socket-1',
+    );
 
     expect(mockRedis.srem).toHaveBeenCalledTimes(1);
-    expect(mockRedis.srem).toHaveBeenCalledWith('presence:ws-1', 'user-1');
+    expect(mockRedis.srem).toHaveBeenCalledWith(
+      'presence:ws-1',
+      'user-1:socket-1',
+    );
     expect(result).toEqual(['ws-1']);
   });
 
   it('returns all affected workspaceIds where user was removed', async () => {
-    mockRedis.keys.mockResolvedValue([
-      'presence:ws-A',
-      'presence:ws-B',
-      'presence:ws-C',
+    mockRedis.scan.mockResolvedValue([
+      '0',
+      ['presence:ws-A', 'presence:ws-B', 'presence:ws-C'],
     ]);
     // user está em ws-A e ws-C, mas não em ws-B
     mockRedis.sismember
@@ -175,16 +207,22 @@ describe('removeUserFromAllWorkspaces', () => {
       .mockResolvedValueOnce(0) // ws-B
       .mockResolvedValueOnce(1); // ws-C
 
-    const result = await presenceService.removeUserFromAllWorkspaces('user-1');
+    const result = await presenceService.removeUserFromAllWorkspaces(
+      'user-1',
+      'socket-1',
+    );
 
     expect(result).toEqual(['ws-A', 'ws-C']);
     expect(mockRedis.srem).toHaveBeenCalledTimes(2);
   });
 
   it('returns always an array — never undefined', async () => {
-    mockRedis.keys.mockResolvedValue([]);
+    mockRedis.scan.mockResolvedValue(['0', []]);
 
-    const result = await presenceService.removeUserFromAllWorkspaces('user-x');
+    const result = await presenceService.removeUserFromAllWorkspaces(
+      'user-x',
+      'socket-x',
+    );
 
     expect(Array.isArray(result)).toBe(true);
   });

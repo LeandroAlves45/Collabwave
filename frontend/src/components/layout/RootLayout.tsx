@@ -1,53 +1,32 @@
 // src/components/layout/RootLayout.tsx
-// Layout para as páginas protegidas (workspace, board)
-// Fornece o shell da aplicação (sidebar, header, etc.) e renderiza o conteúdo das páginas
+// Layout para paginas protegidas, como workspaces e board.
 
 import type { ReactElement } from 'react'
-import { Outlet, useNavigate, Link } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
-import { Logo } from '@/components/common/Logo'
-import { Button } from '@/components/ui/Button'
-import { useAuthStore } from '@/stores/authStore'
+import { Outlet, useNavigate } from 'react-router-dom'
+import { Header } from '@/components/common/Header'
+import { useWorkspaceStore } from '@/stores/workspaceStore'
+import { useAuth } from '@/hooks/useAuth'
 
-// Shell para todas as páginas autenticadas
-// Composta por header fixo + área de conteúdo via <Outlet />
-// TODO: adicionar sidebar, etc. conforme necessário
+// Shell para todas as paginas autenticadas.
 export function RootLayout(): ReactElement {
-  const user = useAuthStore((state) => state.user)
+  // Este layout assume que ProtectedRoute ja validou a sessao antes de renderizar o Outlet.
+  const { logout } = useAuth()
+  const currentWorkspace = useWorkspaceStore((state) => state.currentWorkspace)
+  const resetWorkspaces = useWorkspaceStore((state) => state.reset)
   const navigate = useNavigate()
 
-  function handleLogout(): void {
-    // Limpa o estado do store -> o ProtectedRoute irá redirecionar para /login
-    // A chamada a POST /api/auth/logout (invalidar o refresh token no Redis)
-    useAuthStore.setState({ user: null, accessToken: null })
+  async function handleLogout(): Promise<void> {
+    // Ordem importante: invalida auth primeiro, depois limpa dados derivados de workspaces.
+    await logout()
+    resetWorkspaces()
     navigate('/login', { replace: true })
   }
 
   return (
-    <div className="min-h-screen bg-cw-base flex flex-col">
-      {/* Header fixo no topo */}
-      <header className="h-14 border-b border-cw-border bg-cw-surface flex items-center px-6 gap-4 shrink-0">
-        {/* Logo leva de volta à lista de workspaces */}
-        <Link to="/">
-          <Logo size="sm" />
-        </Link>
+    <div className="flex min-h-screen flex-col bg-cw-bg-primary">
+      <Header workspaceName={currentWorkspace?.name} onLogout={handleLogout} />
 
-        {/* Nome do utilizador + botão de logout alinhados à direita */}
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-sm text-cw-secondary">{user?.name}</span>
-
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleLogout}
-            aria-label="Logout"
-          >
-            <LogOut size={14} />
-          </Button>
-        </div>
-      </header>
-
-      {/* Área de conteúdo: ocupa o restante da viewport */}
+      {/* Area de conteudo: deixa cada pagina decidir o proprio scroll interno. */}
       <main className="flex-1 overflow-auto">
         <Outlet />
       </main>

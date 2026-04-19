@@ -56,6 +56,13 @@ const sampleColumn = {
       position: 0,
       description: null,
       assignee_id: null,
+      created_by: 'user-1',
+      created_at: '2024-01-01T00:00:00.000Z',
+      createdBy: {
+        id: 'user-1',
+        name: 'Test User',
+        initials: 'TU',
+      },
       due_date: null,
       updated_at: '2024-01-01T00:00:00.000Z',
     },
@@ -70,8 +77,16 @@ const sampleTask = {
   position: 0,
   description: null,
   assignee_id: null,
+  created_by: 'user-1',
+  created_at: '2024-01-01T00:00:00.000Z',
+  createdBy: {
+    id: 'user-1',
+    name: 'Test User',
+    initials: 'TU',
+  },
   due_date: null,
   updated_at: '2024-01-01T00:00:00.000Z',
+  workspace_id: WORKSPACE_ID,
 };
 
 // ----------------------------------------------------------------

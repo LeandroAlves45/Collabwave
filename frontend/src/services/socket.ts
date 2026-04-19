@@ -4,7 +4,7 @@
 
 import { io } from 'socket.io-client'
 import { useAuthStore } from '@/stores/authStore'
-import type { Task } from '@/types/task'
+import type { Task, TaskWithUsers } from '@/types/task'
 import type { AuthUser } from '@/types/auth'
 
 // URL base do Socket.io (variável de ambiente do Vite ou fallback local)
@@ -20,10 +20,10 @@ interface ServerToClientEvents {
   'workspace:presence_update': (data: { onlineUsers: AuthUser[] }) => void
 
   // Task criada: nova Task adicionada ao dashboard
-  'task:created': (data: { task: Task }) => void
+  'task:created': (data: { task: Task | TaskWithUsers }) => void
 
   // Task atualizada: Task existente modificada
-  'task:updated': (data: { task: Task }) => void
+  'task:updated': (data: { task: Task | TaskWithUsers }) => void
 
   // Task movida: Task movida entre colunas ou reordenada
   'task:moved': (data: {
@@ -53,6 +53,7 @@ interface ClientToServerEvents {
 
   // Criar uma nova Task
   'task:create': (data: {
+    workspaceId: string
     columnId: string
     title: string
     description?: string
@@ -90,6 +91,9 @@ class SocketService {
   // Indica se estamos atualmente conectados ao servidor
   private connected = false
 
+  // Indica se uma conexão já foi iniciada e ainda não terminou
+  private connecting = false
+
   /**
    * Conecta ao servidor Socket.io com autenticação JWT.
    * Chama este método após login bem-sucedido.
@@ -104,8 +108,8 @@ class SocketService {
    */
   connect(): void {
     // Se já está connectado, não faz nada
-    if (this.connected && this.socket) {
-      console.log('[Socket] Já conectado, ignorando connect()')
+    if (this.socket && (this.connected || this.connecting)) {
+      console.log('[Socket] Já conectado ou conectando, ignorando connect()')
       return
     }
 
@@ -116,6 +120,7 @@ class SocketService {
     }
 
     console.log('[Socket] Conectando ao servidor Socket.io')
+    this.connecting = true
 
     // Criar conexão Socket.io com configuração específica
     this.socket = io(SOCKET_URL, {
@@ -134,55 +139,80 @@ class SocketService {
       reconnectionAttempts: Infinity,
     })
 
-    // ======== EVENT LISTENERS DE CONEXÃO ========
+    // Registar listeners quando socket está pronto
+    // Pequeno delay para garantir que os métodos estão disponíveis
+    this.registerListeners()
+  }
 
-    // Evento: conexão bem-sucedida
-    this.socket.on('connect', () => {
-      console.log('[Socket] Conectado com sucesso:', this.socket?.id)
-      this.connected = true
-    })
+  /**
+   * Registra os event listeners do socket.
+   * Chamado automaticamente após criar a conexão.
+   */
+  private registerListeners(): void {
+    // Verificar se socket existe e tem os métodos prontos
+    if (!this.socket || typeof this.socket.on !== 'function') {
+      // Socket ainda não está pronto, tentar novamente em 50ms
+      setTimeout(() => this.registerListeners(), 50)
+      return
+    }
 
-    // Evento: desconexão
-    this.socket.on('disconnect', (reason: string) => {
-      console.warn('[Socket] Desconectado:', reason)
-      this.connected = false
+    try {
+      // Evento: conexão bem-sucedida
+      this.socket.on('connect', () => {
+        console.log('[Socket] Conectado com sucesso:', this.socket?.id)
+        this.connected = true
+        this.connecting = false
+      })
 
-      // Se a desconexão foi forçada pelo servidor, tenta reconectar
-      if (reason === 'io server disconnect') {
-        console.log('[Socket] Desconexão forçada pelo servidor, reconectando...')
-        this.socket?.connect()
-      }
-    })
+      // Evento: desconexão
+      this.socket.on('disconnect', (reason: string) => {
+        console.warn('[Socket] Desconectado:', reason)
+        this.connected = false
+        this.connecting = false
 
-    // Evento: erro de conexão
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.socket as any).on('connect_error', (error: Error) => {
-      console.error('[Socket] Erro de conexão:', error.message)
+        // Se a desconexão foi forçada pelo servidor, tenta reconectar
+        if (reason === 'io server disconnect') {
+          console.log('[Socket] Desconexão forçada pelo servidor, reconectando...')
+          this.socket?.connect()
+        }
+      })
 
-      // Se o erro for relacionado à autenticação, limpar authStore
-      if (error.message.includes('unauthorized') || error.message.includes('jwt')) {
-        console.error('[Socket] Token inválido, limpando autenticação...')
-        useAuthStore.getState().clearAuth()
-      }
-    })
+      // Evento: erro de conexão
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.socket as any).on('connect_error', (error: Error) => {
+        console.error('[Socket] Erro de conexão:', error.message)
+        this.connecting = false
 
-    // Evento: tentativa de reconexão
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.socket as any).on('reconnect_attempt', (attempt: number) => {
-      console.log(`[Socket] Tentativa de reconexão #${attempt}`)
-    })
+        // Se o erro for relacionado à autenticação, limpar authStore
+        if (error.message.includes('unauthorized') || error.message.includes('jwt')) {
+          console.error('[Socket] Token inválido, limpando autenticação...')
+          useAuthStore.getState().clearAuth()
+        }
+      })
 
-    // Evento: reconexão bem-sucedida
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (this.socket as any).on('reconnect', (attempt: number) => {
-      console.log(`[Socket] Reconectado com sucesso após ${attempt} tentativas`)
-      this.connected = true
-    })
+      // Evento: tentativa de reconexão
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.socket as any).on('reconnect_attempt', (attempt: number) => {
+        console.log(`[Socket] Tentativa de reconexão #${attempt}`)
+        this.connecting = true
+      })
 
-    // Evento: erro genérico do servidor
-    this.socket.on('error', (data: unknown) => {
-      console.error('[Socket] Erro do servidor:', data)
-    })
+      // Evento: reconexão bem-sucedida
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (this.socket as any).on('reconnect', (attempt: number) => {
+        console.log(`[Socket] Reconectado com sucesso após ${attempt} tentativas`)
+        this.connected = true
+        this.connecting = false
+      })
+
+      // Evento: erro genérico do servidor
+      this.socket.on('error', (data: unknown) => {
+        console.error('[Socket] Erro do servidor:', data)
+      })
+    } catch {
+      // Se houver erro ao registar listeners, tentar novamente em 50ms
+      setTimeout(() => this.registerListeners(), 50)
+    }
   }
 
   /**
@@ -204,6 +234,7 @@ class SocketService {
     this.socket.disconnect()
     this.socket = null
     this.connected = false
+    this.connecting = false
   }
 
   /**
@@ -312,6 +343,13 @@ class SocketService {
    */
   isConnected(): boolean {
     return this.connected
+  }
+
+  // Método de reset para testes
+  reset(): void {
+    this.socket = null
+    this.connected = false
+    this.connecting = false
   }
 }
 

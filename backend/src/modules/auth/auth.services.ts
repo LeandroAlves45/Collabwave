@@ -22,7 +22,33 @@ const BCRYPT_ROUNDS = 12;
 
 const REFRESH_TOKEN_PREFIX = 'refresh_token:';
 
-const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+const DURATION_UNITS_IN_SECONDS: Record<string, number> = {
+  s: 1,
+  m: 60,
+  h: 60 * 60,
+  d: 24 * 60 * 60,
+};
+
+function parseDurationToSeconds(value: string): number {
+  const numericValue = Number(value);
+
+  if (Number.isFinite(numericValue)) {
+    return numericValue;
+  }
+
+  const match = value.trim().match(/^(\d+)([smhd])$/);
+
+  if (!match) {
+    throw new Error(`Invalid JWT_REFRESH_EXPIRES_IN value: ${value}`);
+  }
+
+  const [, amount, unit] = match;
+  return Number(amount) * DURATION_UNITS_IN_SECONDS[unit];
+}
+
+const REFRESH_TOKEN_TTL_SECONDS = parseDurationToSeconds(
+  env.JWT_REFRESH_EXPIRES_IN,
+);
 
 function generateAccessToken(
   userId: string,

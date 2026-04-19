@@ -13,14 +13,42 @@ function buildPresenceKey(workspaceId: string): string {
   return `${PRESENCE_PREFIX}${workspaceId}`;
 }
 
+function buildPresenceMember(userId: string, socketId: string): string {
+  return `${userId}:${socketId}`;
+}
+
+function getUserIdFromPresenceMember(member: string): string {
+  return member.split(':')[0];
+}
+
+async function scanPresenceKeys(): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor = '0';
+
+  do {
+    const [nextCursor, batch] = await redisClient.scan(
+      cursor,
+      'MATCH',
+      `${PRESENCE_PREFIX}*`,
+      'COUNT',
+      100,
+    );
+    cursor = nextCursor;
+    keys.push(...batch);
+  } while (cursor !== '0');
+
+  return keys;
+}
+
 export async function addUserToPresence(
   workspaceId: string,
   userId: string,
+  socketId: string,
 ): Promise<void> {
   const key = buildPresenceKey(workspaceId);
 
-  // SADD e idempotente: repetir o mesmo userId nao duplica presenca.
-  await redisClient.sadd(key, userId);
+  // A presenca e guardada por socket para suportar varias tabs do mesmo user.
+  await redisClient.sadd(key, buildPresenceMember(userId, socketId));
 
   // Renova o TTL para a chave nao ficar orfa apos um crash.
   await redisClient.expire(key, PRESENCE_TTL_SECONDS);
@@ -29,10 +57,11 @@ export async function addUserToPresence(
 export async function removeUserFromPresence(
   workspaceId: string,
   userId: string,
+  socketId: string,
 ): Promise<void> {
   const key = buildPresenceKey(workspaceId);
 
-  await redisClient.srem(key, userId);
+  await redisClient.srem(key, buildPresenceMember(userId, socketId));
 }
 
 export async function getOnlineUsers(
@@ -40,7 +69,10 @@ export async function getOnlineUsers(
 ): Promise<Array<{ id: string; email: string; name: string }>> {
   const key = buildPresenceKey(workspaceId);
 
-  const userIds = await redisClient.smembers(key);
+  const presenceMembers = await redisClient.smembers(key);
+  const userIds = Array.from(
+    new Set(presenceMembers.map(getUserIdFromPresenceMember)),
+  );
 
   if (userIds.length === 0) {
     return [];
@@ -56,16 +88,18 @@ export async function getOnlineUsers(
 // Cleanup de disconnect: remove o user de todos os workspaces onde estava.
 export async function removeUserFromAllWorkspaces(
   userId: string,
+  socketId: string,
 ): Promise<string[]> {
-  const keys = await redisClient.keys(`${PRESENCE_PREFIX}*`);
+  const keys = await scanPresenceKeys();
 
   const affectedWorkspacesIds: string[] = [];
+  const presenceMember = buildPresenceMember(userId, socketId);
 
   for (const key of keys) {
-    const isMember = await redisClient.sismember(key, userId);
+    const isMember = await redisClient.sismember(key, presenceMember);
 
     if (isMember) {
-      await redisClient.srem(key, userId);
+      await redisClient.srem(key, presenceMember);
 
       const workspaceId = key.replace(PRESENCE_PREFIX, '');
       affectedWorkspacesIds.push(workspaceId);

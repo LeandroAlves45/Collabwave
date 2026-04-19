@@ -9,17 +9,17 @@ import ApiClient from '@/services/api'
 import { useWorkspaceStore, type WorkspaceWithRole } from '@/stores/workspaceStore'
 import { useNavigate } from 'react-router-dom'
 import SocketService from '@/services/socket'
-import { Card } from '@/components/ui/Card'
+import { WorkspaceCard } from '@/components/common/WorkspaceCard'
+import { WaveLine } from '@/components/common/WaveLine'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, LogOut } from 'lucide-react'
-
+import { Plus, X, Loader2, Copy, Check } from 'lucide-react'
 
 // WorkspacesPage: dashboard principal após autenticação
 // Mostra lista de workspaces do utilizador com opções de criar/entrar
 export function WorkspacesPage(): ReactElement {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  useAuth()
 
   // Workspace Store
   const {
@@ -27,21 +27,25 @@ export function WorkspacesPage(): ReactElement {
     isLoading,
     error,
     setWorkspaces,
+    addWorkspace,
+    setCurrentWorkspace,
     setLoading,
     setError,
   } = useWorkspaceStore()
 
+  // Estado para criar workspace
+  const [isCreating, setIsCreating] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createDescription, setCreateDescription] = useState('')
 
-  // Estados locais para modais de criar/entrar workspace
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
+  // Estado para entrar em workspace
+  const [isJoining, setIsJoining] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
 
-  // Campos de formulário: nome do workspace a criar e invite code para entrar
-  const [createWorkspaceName, setCreateWorkspaceName] = useState('')
-  const [createWorkspaceDescription, setCreateWorkspaceDescription] = useState('')
-  const [joinInviteCode, setJoinInviteCode] = useState('')
+  // Estado para partilhar o invite code de um workspace
+  const [inviteWorkspace, setInviteWorkspace] = useState<WorkspaceWithRole | null>(null)
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
 
-  
   // ========== EFEITO: CARREGAR WORKSPACES AO MONTAR ==========
   /**
    * Ao montar componente:
@@ -57,6 +61,7 @@ export function WorkspacesPage(): ReactElement {
         setError(null)
 
         // Chama API para obter lista de workspaces do utilizador autenticado
+        // Lista inicial e fonte da verdade antes de qualquer criacao/entrada local.
         const data = await ApiClient.listWorkspaces()
 
         // Armazena no Zustand store
@@ -77,28 +82,40 @@ export function WorkspacesPage(): ReactElement {
     loadWorkspaces()
 
     // Conecta Socket.io se não conectado
+    // Mantem o socket preparado para eventos em tempo real nas paginas seguintes.
     if (!SocketService.isConnected()) {
       SocketService.connect()
     }
-
   }, [setWorkspaces, setLoading, setError])
-
-  // Handler: LOGOUT
-  /**
-   * Termina sessão do utilizador.
-   * useAuth.logout() desconecta Socket.io automaticamente.
-   */
-  const handleLogout = async () => {
-    await logout()
-    navigate('/login')
-  }
 
   // Handler: abre workspace ao clicar no Card
   /**
    * Navega para BoardPage do workspace selecionado.
    */
-  const handleOpenWorkspace = (workspaceId: string): void => {
-    navigate(`/board/${workspaceId}`);
+  const handleOpenWorkspace = (workspace: WorkspaceWithRole): void => {
+    setCurrentWorkspace(workspace)
+    navigate(`/board/${workspace.id}`)
+  }
+
+  const handleOpenInviteModal = (workspace: WorkspaceWithRole): void => {
+    setInviteWorkspace(workspace)
+    setCopyStatus('idle')
+  }
+
+  const handleCloseInviteModal = (): void => {
+    setInviteWorkspace(null)
+    setCopyStatus('idle')
+  }
+
+  const handleCopyInviteCode = async (): Promise<void> => {
+    if (!inviteWorkspace?.inviteCode) return
+
+    try {
+      await navigator.clipboard.writeText(inviteWorkspace.inviteCode)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('error')
+    }
   }
 
   // Handler: Criar workspace
@@ -108,9 +125,9 @@ export function WorkspacesPage(): ReactElement {
    */
   const handleCreateWorkspace = async () => {
     // Validação simples
-    if (!createWorkspaceName.trim()) {
+    if (!createName.trim()) {
       alert('Nome do Workspace é obrigatório.')
-      return;
+      return
     }
 
     try {
@@ -118,22 +135,22 @@ export function WorkspacesPage(): ReactElement {
 
       // Chama API para criar novo workspace
       const newWorkspace = await ApiClient.createWorkspace({
-        name: createWorkspaceName.trim(),
-        description: createWorkspaceDescription.trim() || undefined,
+        name: createName.trim(),
+        description: createDescription.trim() || undefined,
       })
 
       // Adiciona workspace à lista local
-      setWorkspaces([...workspaces, newWorkspace as WorkspaceWithRole])
+      // Atualizacao local: assume que a API devolve o workspace completo.
+      addWorkspace(newWorkspace as WorkspaceWithRole)
 
       console.log('[WorkspacesPage]Workspace criado:', newWorkspace.name)
 
       // Fecha modal e limpa campos
-      setShowCreateModal(false)
-      setCreateWorkspaceName('')
-      setCreateWorkspaceDescription('')
+      setCreateName('')
+      setCreateDescription('')
+      setIsCreating(false)
     } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'Erro ao criar workspace'
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar workspace'
       setError(errorMessage)
       console.error('[WorkspacesPage]Erro ao criar workspace:', err)
     } finally {
@@ -141,11 +158,22 @@ export function WorkspacesPage(): ReactElement {
     }
   }
 
-  // Handler: submete formulário de entrar em workspace com invite code
+  // Handler: Cancela a criação do workspace (fecha modal e limpa campos)
+  const handleCancelCreate = () => {
+    setCreateName('')
+    setCreateDescription('')
+    setIsCreating(false)
+  }
+
+  // Handler: Entra no workspace usando código de convite
+  /**
+   * Valida código de convite, chama API para entrar em workspace.
+   * Após sucesso, adiciona workspace à lista local.
+   */
   const handleJoinWorkspace = async () => {
-    if (!joinInviteCode.trim()) {
+    if (!joinCode.trim()) {
       alert('Código de convite é obrigatório.')
-      return;
+      return
     }
 
     try {
@@ -153,17 +181,18 @@ export function WorkspacesPage(): ReactElement {
 
       // Chama API para entrar em workspace
       const workspace = await ApiClient.joinWorkspace({
-        inviteCode: joinInviteCode.trim(),
+        inviteCode: joinCode.trim(),
       })
 
       // Adiciona workspace à lista local
-      setWorkspaces([...workspaces, workspace as WorkspaceWithRole])
+      // Atualizacao local apos join; o store evita duplicados por id.
+      addWorkspace(workspace as WorkspaceWithRole)
 
       console.log('[WorkspacesPage]Entrou em workspace:', workspace.name)
 
       // Fecha modal e limpa campo
-      setShowJoinModal(false)
-      setJoinInviteCode('')
+      setJoinCode('')
+      setIsJoining(false)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'Erro ao entrar em workspace'
@@ -174,266 +203,244 @@ export function WorkspacesPage(): ReactElement {
     }
   }
 
-  // Função auxiliar: retorna cor de badge baseado no role
-  // owner -> verde (cw-accent), admin -> amarelo, member -> cinza
-  const getRoleBadgeColor = (role: 'owner' | 'admin' | 'member'): string => {
-    switch (role) {
-      case 'owner':
-        return 'bg-cw-accent text-black'
-      case 'admin':
-        return 'bg-yellow-400 text-black'
-      case 'member':
-        return 'bg-cw-border text-cw-text-secondary'
-    }
+  // Handler: Cancel join workspace (fecha modal e limpa campo)
+  const handleCancelJoin = () => {
+    setJoinCode('')
+    setIsJoining(false)
   }
 
-  // Função auxiliar: retorna label em português para o role
-  const getRoleLabel = (role: 'owner' | 'admin' | 'member'): string => {
-    const roleMap: Record<'owner' | 'admin' | 'member', string> = {
-      'owner': 'Proprietário',
-      'admin': 'Administrador',
-      'member': 'Membro',
-    }
-    return roleMap[role]
-  }
-
-  // Função auxiliar: formata data para formato legível (ex: "Há 2 dias")
-  const formatDate = (isoDate: string): string => {
-    const date = new Date(isoDate)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-    if (diffDays === 0) return 'Hoje'
-    if (diffDays === 1) return 'Há 1 dia'
-    if (diffDays < 7) return `Há ${diffDays} dias`
-    if (diffDays < 30) return `Há ${Math.floor(diffDays / 7)} semanas`
-    return `Há ${Math.floor(diffDays / 30)} meses`
+  // Loading state
+  if (isLoading && workspaces.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-cw-base">
+        <Loader2 className="h-8 w-8 animate-spin text-cw-wave" />
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-cw-bg-primary py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Header com saudação e botões de ação */}
-        <div className="mb-8 flex justify-between items-center">
+    <div className="min-h-screen flex flex-col bg-cw-base">
+      <main className="flex-1 p-6 max-w-7xl mx-auto w-full">
+        {/* Cabeçalho */}
+        <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-cw-text-primary mb-2">
-              Workspaces
+            <h1 className="font-heading font-extrabold text-2xl text-cw-primary">
+              Your Workspaces
             </h1>
-            <p className="text-cw-text-secondary">
-              Bem-vindo, <span className="font-medium">{user?.name}</span>
+            <p className="text-sm text-cw-muted mt-1">
+              Select a workspace to start collaborating
             </p>
           </div>
 
-          {/* Botões de ação */}
-          <div className="flex gap-3">
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 bg-cw-accent text-black hover:bg-cw-accent/90"
-              disabled={isLoading}
-            >
-              <Plus size={18} />
-              Criar Workspace
-            </Button>
-            <Button
-              onClick={() => setShowJoinModal(true)}
-              variant="outline"
-              disabled={isLoading}
-            >
-              Entrar com Código
-            </Button>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <LogOut size={18} />
-              Sair
-            </Button>
-          </div>
+          {!isCreating && !isJoining && (
+            <div className="flex gap-3">
+              <Button
+                onClick={() => setIsCreating(true)}
+                className="bg-cw-wave text-cw-base hover:bg-cw-wave/90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Workspace
+              </Button>
+              <Button
+                onClick={() => setIsJoining(true)}
+                variant="outline"
+                className="border-cw-border text-cw-primary hover:bg-cw-surface"
+              >
+                Join Code
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Mensagem de erro global */}
+        {/* Mensagem de erro */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="mb-6 rounded-md border border-cw-error/40 bg-cw-error/10 p-3 text-sm text-cw-error">
             {error}
           </div>
         )}
 
-        {/* Loading state */}
-        {isLoading && workspaces.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-cw-text-secondary">A carregar workspaces...</p>
+        {/* Form de criar workspace */}
+        {isCreating && (
+          <div className="bg-cw-surface border-thin border-cw-border rounded-lg p-4 mb-6">
+            <WaveLine isActive className="mb-4" />
+            <h2 className="font-heading font-bold text-lg text-cw-primary mb-4">
+              Create New Workspace
+            </h2>
+            <div className="space-y-3">
+              <Input
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="Workspace name"
+                autoFocus
+                className="bg-cw-base border-cw-border"
+                disabled={isLoading}
+              />
+              <Input
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+                placeholder="Description (optional)"
+                className="bg-cw-base border-cw-border"
+                disabled={isLoading}
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleCreateWorkspace}
+                  disabled={!createName.trim() || isLoading}
+                  className="bg-cw-wave text-cw-base hover:bg-cw-wave/90"
+                >
+                  Create
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleCancelCreate}
+                  className="text-cw-muted hover:text-cw-secondary hover:bg-cw-base"
+                  disabled={isLoading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Empty state */}
-        {!isLoading && workspaces.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-cw-text-secondary mb-4">
-              Ainda não tens workspaces.
+        {/* Form de entrar em workspace */}
+        {isJoining && (
+          <div className="bg-cw-surface border-thin border-cw-border rounded-lg p-4 mb-6">
+            <WaveLine isActive className="mb-4" />
+            <h2 className="font-heading font-bold text-lg text-cw-primary mb-4">
+              Join Workspace
+            </h2>
+            <p className="text-sm text-cw-muted mb-4">
+              Enter the invite code to join an existing workspace
             </p>
-            <Button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-cw-accent text-black hover:bg-cw-accent/90"
-            >
-              Criar Primeiro Workspace
-            </Button>
+            <div className="space-y-3">
+              <Input
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="Enter invite code (e.g. ABC123)"
+                autoFocus
+                className="bg-cw-base border-cw-border font-mono"
+                disabled={isLoading}
+                maxLength={6}
+              />
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleJoinWorkspace}
+                  disabled={!joinCode.trim() || isLoading}
+                  className="bg-cw-wave text-cw-base hover:bg-cw-wave/90"
+                >
+                  Join
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleCancelJoin}
+                  className="text-cw-muted hover:text-cw-secondary hover:bg-cw-base"
+                  disabled={isLoading}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {inviteWorkspace && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-md rounded-lg border border-cw-border bg-cw-surface p-6">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-heading text-lg font-bold text-cw-primary">
+                    Share invite
+                  </h2>
+                  <p className="mt-1 text-sm text-cw-muted">
+                    Send this code to someone you want to invite to {inviteWorkspace.name}.
+                  </p>
+                </div>
+                <button
+                  onClick={handleCloseInviteModal}
+                  className="rounded-md p-1 text-cw-muted hover:text-cw-primary focus:outline-none focus:ring-2 focus:ring-cw-wave/50"
+                  aria-label="Close invite modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="rounded-lg border border-cw-border bg-cw-base p-4">
+                <p className="mb-2 text-xs font-medium uppercase text-cw-muted">
+                  Invite code
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <code className="font-mono text-2xl font-bold tracking-widest text-cw-primary">
+                    {inviteWorkspace.inviteCode || '------'}
+                  </code>
+                  <Button
+                    onClick={handleCopyInviteCode}
+                    disabled={!inviteWorkspace.inviteCode}
+                    className="bg-cw-wave text-cw-base hover:bg-cw-wave/90"
+                  >
+                    {copyStatus === 'copied' ? (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm text-cw-muted">
+                The other person should sign in, choose Join Code, and paste this code.
+              </p>
+
+              {copyStatus === 'error' && (
+                <p className="mt-3 text-sm text-cw-error">
+                  Could not copy automatically. Select the code and copy it manually.
+                </p>
+              )}
+            </div>
           </div>
         )}
 
         {/* Grid de workspaces */}
-        {workspaces.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {workspaces.map((workspace) => (
-              <Card
-                key={workspace.id}
-                className="p-4 cursor-pointer hover:bg-cw-bg-secondary transition-colors"
-                onClick={() => handleOpenWorkspace(workspace.id)}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {workspaces.map((workspace) => (
+            <WorkspaceCard
+              key={workspace.id}
+              workspace={workspace}
+              onClick={() => handleOpenWorkspace(workspace)}
+              onShare={handleOpenInviteModal}
+            />
+          ))}
+        </div>
+
+        {/* Empty state */}
+        {workspaces.length === 0 && !isCreating && !isJoining && (
+          <div className="text-center py-12">
+            <p className="text-cw-muted mb-4">No workspaces yet</p>
+            <div className="flex gap-3 justify-center">
+              <Button
+                onClick={() => setIsCreating(true)}
+                className="bg-cw-wave text-cw-base hover:bg-cw-wave/90"
               >
-                {/* Header do card: nome + badge de role */}
-                <div className="flex justify-between items-start mb-3">
-                  <h3 className="text-lg font-semibold text-cw-text-primary flex-1">
-                    {workspace.name}
-                  </h3>
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded ${getRoleBadgeColor(workspace.role)}`}
-                  >
-                    {getRoleLabel(workspace.role)}
-                  </span>
-                </div>
-
-                {/* Descrição do workspace (se existir) */}
-                {workspace.description && (
-                  <p className="text-sm text-cw-text-secondary mb-3 line-clamp-2">
-                    {workspace.description}
-                  </p>
-                )}
-
-                {/* Footer do card: invite code + data de criação */}
-                <div className="text-xs text-cw-text-secondary space-y-1 border-t border-cw-border pt-3">
-                  <div>
-                    <span className="text-cw-text-secondary">Código: </span>
-                    <span className="font-mono text-cw-accent">
-                      {workspace.inviteCode}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-cw-text-secondary">Criado </span>
-                    <span>{formatDate(workspace.createdAt)}</span>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                <Plus className="h-4 w-4 mr-2" />
+                Create your first workspace
+              </Button>
+              <Button
+                onClick={() => setIsJoining(true)}
+                variant="outline"
+                className="border-cw-border text-cw-primary hover:bg-cw-surface"
+              >
+                Join with code
+              </Button>
+            </div>
           </div>
         )}
-
-        {/* Modal: Criar novo workspace */}
-        {showCreateModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-md p-6">
-              <h2 className="text-xl font-bold text-cw-text-primary mb-4">
-                Criar Novo Workspace
-              </h2>
-
-              <div className="space-y-4">
-                {/* Campo: Nome do workspace */}
-                <div>
-                  <label className="block text-sm font-medium text-cw-text-primary mb-2">
-                    Nome do Workspace *
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Ex: Projeto Q2"
-                    value={createWorkspaceName}
-                    onChange={(e) => setCreateWorkspaceName(e.target.value)}
-                    autoFocus
-                    disabled={isLoading}
-                  />
-                </div>
-
-                {/* Campo: Descrição (opcional) */}
-                <div>
-                  <label className="block text-sm font-medium text-cw-text-primary mb-2">
-                    Descrição (opcional)
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Breve descrição do workspace"
-                    value={createWorkspaceDescription}
-                    onChange={(e) => setCreateWorkspaceDescription(e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Botões de ação */}
-              <div className="flex gap-3 mt-6">
-                <Button
-                  onClick={handleCreateWorkspace}
-                  className="flex-1 bg-cw-accent text-black hover:bg-cw-accent/90"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'A criar...' : 'Criar'}
-                </Button>
-                <Button
-                  onClick={() => setShowCreateModal(false)}
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {/* Modal: Entrar em workspace com invite code */}
-        {showJoinModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-md p-6">
-              <h2 className="text-xl font-bold text-cw-text-primary mb-4">
-                Entrar em Workspace
-              </h2>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-cw-text-primary mb-2">
-                  Código de Convite
-                </label>
-                <Input
-                  type="text"
-                  placeholder="Ex: ABC123"
-                  value={joinInviteCode}
-                  onChange={(e) => setJoinInviteCode(e.target.value.toUpperCase())}
-                  autoFocus
-                  disabled={isLoading}
-                  maxLength={6}
-                />
-              </div>
-
-              {/* Botões de ação */}
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleJoinWorkspace}
-                  className="flex-1 bg-cw-accent text-black hover:bg-cw-accent/90"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'A entrar...' : 'Entrar'}
-                </Button>
-                <Button
-                  onClick={() => setShowJoinModal(false)}
-                  variant="outline"
-                  className="flex-1"
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   )
 }

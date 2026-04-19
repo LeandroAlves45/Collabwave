@@ -14,16 +14,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       type={type}
       className={cn(
         /* Estilos base */
-        'w-full px-3 py-2 rounded-md text-sm',
+        'h-9 w-full rounded-md px-3 text-sm transition-colors',
         /* Cores do tema */
-        'bg-cw-base text-cw-primary placeholder:text-cw-muted',
+        'bg-[#081421] text-cw-text-primary placeholder:text-cw-text-muted',
         /* Border e hover */
-        'border-[0.5px] border-cw-border',
-        'hover:border-cw-secondary',
+        'border border-cw-border',
+        'hover:border-cw-text-secondary',
         /* Focus state */
-        'focus:outline-none focus:ring-2 focus:ring-cw-wave focus:border-transparent',
+        'focus:border-transparent focus:outline-none focus:ring-2 focus:ring-cw-accent',
         /* Estados desativados */
-        'disabled:bg-cw-surface disabled:text-cw-muted disabled:cursor-not-allowed disabled:opacity-50',
+        'disabled:cursor-not-allowed disabled:bg-cw-bg-secondary disabled:text-cw-text-muted disabled:opacity-50',
         className,
       )}
       {...props}

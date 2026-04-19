@@ -19,6 +19,7 @@ export const Logo: React.FC<LogoProps> = ({
   showText = true,
 }) => {
   /* Mapeamento de tamanho para classes Tailwind */
+  // Presets de tamanho mantem SVG e texto alinhados nas paginas auth e no header.
   const sizeMap: Record<LogoSize, { icon: string; text: string }> = {
     sm: { icon: 'w-5 h-5', text: 'text-lg' },
     md: { icon: 'w-7 h-7', text: 'text-2xl' },
@@ -33,7 +34,7 @@ export const Logo: React.FC<LogoProps> = ({
       <svg
         viewBox="0 0 32 32"
         fill="none"
-        className={cn('shrink-0 text-cw-wave', iconSize)}
+        className={cn('shrink-0 text-cw-accent', iconSize)}
       >
         {/* Primeira onda (mais opaca) */}
         <path
@@ -69,7 +70,7 @@ export const Logo: React.FC<LogoProps> = ({
       {showText && (
         <span
           className={cn(
-            'font-display font-extrabold tracking-tight text-cw-primary',
+            'font-heading font-extrabold text-cw-text-primary',
             textSize,
           )}
         >

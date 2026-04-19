@@ -294,8 +294,16 @@ describe('WebSocket — task:create', () => {
     position: 0,
     description: null,
     assignee_id: null,
+    created_by: 'user-1',
+    created_at: '2024-01-01T00:00:00.000Z',
+    createdBy: {
+      id: 'user-1',
+      name: 'Test User',
+      initials: 'TU',
+    },
     due_date: null,
     updated_at: new Date().toISOString(),
+    workspace_id: WORKSPACE_ID,
   };
 
   it('creates task and emits task:created to the room', async () => {
@@ -368,6 +376,13 @@ describe('WebSocket — task:update', () => {
     position: 0,
     description: null,
     assignee_id: null,
+    created_by: 'user-1',
+    created_at: '2024-01-01T00:00:00.000Z',
+    createdBy: {
+      id: 'user-1',
+      name: 'Test User',
+      initials: 'TU',
+    },
     due_date: null,
     updated_at: new Date().toISOString(),
     workspace_id: WORKSPACE_ID,
@@ -473,6 +488,8 @@ describe('WebSocket — task:move', () => {
     position: 1,
     description: null,
     assignee_id: null,
+    created_by: 'user-1',
+    created_at: '2024-01-01T00:00:00.000Z',
     due_date: null,
     updated_at: new Date().toISOString(),
     workspace_id: WORKSPACE_ID,
@@ -635,6 +652,7 @@ describe('WebSocket — disconnect cleanup', () => {
     await waitForCondition(() => {
       expect(mockPresence.removeUserFromAllWorkspaces).toHaveBeenCalledWith(
         'user-1',
+        expect.any(String),
       );
     });
   });

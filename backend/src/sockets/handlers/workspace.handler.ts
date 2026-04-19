@@ -59,7 +59,7 @@ export function registerWorkspaceHandler(
         `[WORKSPACE] ${user.email} joined room ${room} (socket: ${socket.id}`,
       );
 
-      await addUserToPresence(workspaceId, user.id);
+      await addUserToPresence(workspaceId, user.id, socket.id);
 
       const onlineUsers = await getOnlineUsers(workspaceId);
 
@@ -93,7 +93,7 @@ export function registerWorkspaceHandler(
 
       await socket.leave(room);
 
-      await removeUserFromPresence(workspaceId, user.id);
+      await removeUserFromPresence(workspaceId, user.id, socket.id);
 
       const onlineUsers = await getOnlineUsers(workspaceId);
       io.to(room).emit('workspace:presence_update', { onlineUsers });
@@ -116,7 +116,7 @@ export function registerWorkspaceHandler(
     );
 
     try {
-      const result = await removeUserFromAllWorkspaces(user.id);
+      const result = await removeUserFromAllWorkspaces(user.id, socket.id);
 
       // Defesa para mocks que devolvem undefined apos clearAllMocks().
       const affectedWorkspacesIds = Array.isArray(result) ? result : [];

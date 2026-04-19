@@ -15,6 +15,8 @@ function generateInviteCode(): string {
   return crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
 }
 
+const DEFAULT_COLUMNS = ['Backlog', 'To Do', 'In Progress', 'Review', 'Done'];
+
 export async function createWorkspace(
   userId: string,
   payload: CreateWorkspacePayload,
@@ -37,6 +39,14 @@ export async function createWorkspace(
       user_id: userId,
       role: 'owner',
     });
+
+    await trx('columns').insert(
+      DEFAULT_COLUMNS.map((title, position) => ({
+        workspace_id: newWorkspace.id,
+        title,
+        position,
+      })),
+    );
 
     return newWorkspace as Workspace;
   });

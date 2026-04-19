@@ -3,12 +3,12 @@
 // Armazena a lista de workspaces do utilizador, detalhes do workspace selecionado, etc.
 
 import { create } from 'zustand'
-import type { Workspace, WorkspaceMember } from '@/types/workspace'
+import type { Workspace, WorkspaceMember, WorkspaceRole } from '@/types/workspace'
 
 // Interface para workspace com role do utilizador atual
 // Necessário saber se o utilizador é owner/admin/member para mostrar opções corretas na UI
 export interface WorkspaceWithRole extends Workspace {
-  role: 'owner' | 'admin' | 'member'
+  role: WorkspaceRole
 }
 
 interface WorkspaceState {
@@ -36,6 +36,9 @@ interface WorkspaceState {
 
   // Atualiza lista de workspaces
   setWorkspaces: (workspaces: WorkspaceWithRole[]) => void
+
+  // Adiciona ou atualiza um workspace sem duplicar por id
+  addWorkspace: (workspace: WorkspaceWithRole) => void
 
   // Atualiza lista de membros do workspace atual
   setMembers: (members: WorkspaceMember[]) => void
@@ -68,6 +71,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   // Atualiza lista de workspaces do utilizador (chamado após carregar workspaces)
   setWorkspaces: (workspaces: WorkspaceWithRole[]): void => {
     set({ workspaces, error: null })
+  },
+
+  // Adiciona workspace novo ou substitui o existente com o mesmo id
+  addWorkspace: (workspace: WorkspaceWithRole): void => {
+    set((state) => {
+      const exists = state.workspaces.some((item) => item.id === workspace.id)
+
+      return {
+        workspaces: exists
+          ? state.workspaces.map((item) =>
+              item.id === workspace.id ? workspace : item
+            )
+          : [...state.workspaces, workspace],
+        error: null,
+      }
+    })
   },
 
   // Atualiza lista de membros do workspace atual (chamado após carregar membros)

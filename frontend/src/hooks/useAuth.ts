@@ -8,6 +8,8 @@ import ApiClient from '@/services/api'
 import SocketService from '@/services/socket'
 import type { LoginPayload, RegisterPayload } from '@/types/auth'
 
+let restoreSessionPromise: Promise<void> | null = null
+
 /**
  * Hook de autenticação que expõe estado e métodos para login, register e logout.
  *
@@ -99,7 +101,7 @@ export function useAuth() {
    * 3. Se sucesso: armazena tokens + conecta Socket.io (registo autentica automaticamente)
    * 4. Se erro: mostra mensagem + limpa após 5s
    *
-   * @param payload - { name, email, password, passwordConfirmation }
+   * @param payload - { name, email, password, passwordConfirmation? }
    * @returns Promise que resolve quando registo completo
    * @throws Não lança erro — captura e mostra via setError
    */
@@ -245,6 +247,16 @@ export function useAuth() {
    */
   useEffect(() => {
     const restoreSession = async () => {
+      const currentAuth = useAuthStore.getState()
+
+      if (currentAuth.user && currentAuth.accessToken) {
+        return
+      }
+
+      if (restoreSessionPromise) {
+        return restoreSessionPromise
+      }
+
       const refreshToken = localStorage.getItem('refreshToken')
 
       // Se não houver refresh token, nada a restaurar
@@ -252,24 +264,39 @@ export function useAuth() {
         return
       }
 
-      try {
-        console.log('[useAuth] Tentando restaurar sessão...')
+      restoreSessionPromise = (async () => {
+        try {
+          const latestAuth = useAuthStore.getState()
 
-        // Tenta obter novo access token + user do backend
-        const response = await ApiClient.refresh(refreshToken)
+          if (latestAuth.user && latestAuth.accessToken) {
+            return
+          }
 
-        // Backend retorna user, não precisa buscar do localStorage
-        setAuth(response.user, response.accessToken, response.refreshToken)
-        SocketService.connect()
-        console.log('[useAuth] Sessão restaurada com sucesso.')
-      } catch (err) {
-        // Refresh token expirado ou inválido — limpa tokens
-        console.warn('[useAuth] Não foi possível restaurar sessão:', err)
-        clearAuth()
-      }
+          console.log('[useAuth] Tentando restaurar sessão...')
+
+          // Tenta obter novo access token + user do backend
+          const response = await ApiClient.refresh(refreshToken)
+
+          // Backend retorna user, não precisa buscar do localStorage
+          setAuth(response.user, response.accessToken, response.refreshToken)
+          SocketService.connect()
+          console.log('[useAuth] Sessão restaurada com sucesso.')
+        } catch (err) {
+          // Refresh token expirado ou inválido — limpa tokens
+          console.warn('[useAuth] Não foi possível restaurar sessão:', err)
+
+          if (localStorage.getItem('refreshToken') === refreshToken) {
+            clearAuth()
+          }
+        } finally {
+          restoreSessionPromise = null
+        }
+      })()
+
+      return restoreSessionPromise
     }
 
-    restoreSession()
+    void restoreSession()
   }, [setAuth, clearAuth])
 
   // ========== EFEITO: PERSISTIR USER EM LOCALSTORAGE ==========

@@ -521,7 +521,42 @@ Authorization: Bearer {accessToken}
 
 ## Column Endpoints
 
-### 15. Create Column
+### 15. Get Workspace Columns
+
+- **Method:** `GET`
+- **Route:** `/api/workspaces/:id/columns`
+- **Auth Required:** ✅ Yes (Bearer token)
+- **Membership Required:** ✅ Yes
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "workspaceId": "uuid",
+      "title": "string",
+      "position": "number"
+    }
+  ]
+}
+```
+
+**Error Codes:**
+- `401` - Missing or invalid token
+- `403` - User is not member of workspace
+- `404` - Workspace not found
+
+**Notes:**
+
+- Retorna colunas ordenadas por `position` ascendente
+- Array vazio se nenhuma coluna existe
+
+---
+
+### 16. Create Column
+
 - **Method:** `POST`
 - **Route:** `/api/workspaces/:id/columns`
 - **Auth Required:** ✅ Yes (Bearer token)
@@ -548,6 +583,7 @@ Authorization: Bearer {accessToken}
 ```
 
 **Error Codes:**
+
 - `400` - Invalid input
 - `401` - Missing or invalid token
 - `403` - User is not member of workspace
@@ -555,7 +591,8 @@ Authorization: Bearer {accessToken}
 
 ---
 
-### 16. Update Column
+### 17. Update Column
+
 - **Method:** `PATCH`
 - **Route:** `/api/columns/:columnId`
 - **Auth Required:** ✅ Yes (Bearer token)
@@ -582,17 +619,20 @@ Authorization: Bearer {accessToken}
 ```
 
 **Error Codes:**
+
 - `400` - Invalid input
 - `401` - Missing or invalid token
 - `403` - User is not member of workspace
 - `404` - Column not found
 
 **Notes:**
+
 - Route must come BEFORE `/:columnId/reorder` to match correctly
 
 ---
 
-### 17. Reorder Column
+### 18. Reorder Column
+
 - **Method:** `PATCH`
 - **Route:** `/api/columns/:columnId/reorder`
 - **Auth Required:** ✅ Yes (Bearer token)
@@ -619,17 +659,20 @@ Authorization: Bearer {accessToken}
 ```
 
 **Error Codes:**
+
 - `400` - Invalid input
 - `401` - Missing or invalid token
 - `403` - User is not member of workspace
 - `404` - Column not found
 
 **Notes:**
+
 - Route must come BEFORE `/:columnId` to match correctly
 
 ---
 
-### 18. Delete Column
+### 19. Delete Column
+
 - **Method:** `DELETE`
 - **Route:** `/api/columns/:columnId`
 - **Auth Required:** ✅ Yes (Bearer token)
@@ -641,6 +684,7 @@ Authorization: Bearer {accessToken}
 ```
 
 **Error Codes:**
+
 - `401` - Missing or invalid token
 - `403` - User is not member of workspace
 - `404` - Column not found

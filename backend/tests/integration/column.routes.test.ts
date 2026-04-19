@@ -4,6 +4,7 @@
 // Testa os endpoints HTTP de columns contra o app Express.
 //
 // ENDPOINTS COBERTOS:
+//   GET    /api/workspaces/:id/columns
 //   POST   /api/workspaces/:id/columns
 //   PATCH  /api/columns/:columnId
 //   DELETE /api/columns/:columnId
@@ -35,11 +36,86 @@ beforeEach(() => jest.clearAllMocks());
 const WORKSPACE_ID = 'a0000000-0000-0000-0000-000000000001';
 const COLUMN_ID    = 'a0000000-0000-0000-0000-000000000002';
 
+// ----------------------------------------------------------------
+// GET /api/workspaces/:id/columns
+// ----------------------------------------------------------------
+describe('GET /api/workspaces/:id/columns', () => {
+  it('returns 200 with list of columns ordered by position', async () => {
+    const columns = [sampleColumn, sampleColumnInProgress, sampleColumnDone];
+    mockColumnService.getColumnsForWorkspace.mockResolvedValue(columns);
+
+    const res = await request(app).get(
+      `/api/workspaces/${WORKSPACE_ID}/columns`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBe(3);
+    expect(res.body.data[0].title).toBe('To Do');
+    expect(res.body.data[1].title).toBe('In Progress');
+    expect(res.body.data[2].title).toBe('Done');
+  });
+
+  it('returns 200 with empty array when no columns exist', async () => {
+    mockColumnService.getColumnsForWorkspace.mockResolvedValue([]);
+
+    const res = await request(app).get(
+      `/api/workspaces/${WORKSPACE_ID}/columns`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('returns 403 when user does not have access to workspace', async () => {
+    const { AppError } = await import('../../src/middleware/errorHandler.js');
+    mockColumnService.getColumnsForWorkspace.mockRejectedValue(
+      new AppError('Access denied to this workspace.', 403),
+    );
+
+    const res = await request(app).get(
+      `/api/workspaces/${WORKSPACE_ID}/columns`,
+    );
+
+    expect(res.status).toBe(403);
+    expect(res.body.status).toBe('error');
+  });
+
+  it('converts snake_case (workspace_id) to camelCase (workspaceId)', async () => {
+    mockColumnService.getColumnsForWorkspace.mockResolvedValue([sampleColumn]);
+
+    const res = await request(app).get(
+      `/api/workspaces/${WORKSPACE_ID}/columns`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toHaveProperty('workspaceId');
+    expect(res.body.data[0]).not.toHaveProperty('workspace_id');
+    expect(res.body.data[0].workspaceId).toBe(WORKSPACE_ID);
+  });
+});
+
 const sampleColumn = {
   id: COLUMN_ID,
   workspace_id: WORKSPACE_ID,
   title: 'To Do',
   position: 0,
+};
+
+const sampleColumnInProgress = {
+  id: 'a0000000-0000-0000-0000-000000000003',
+  workspace_id: WORKSPACE_ID,
+  title: 'In Progress',
+  position: 1,
+};
+
+const sampleColumnDone = {
+  id: 'a0000000-0000-0000-0000-000000000004',
+  workspace_id: WORKSPACE_ID,
+  title: 'Done',
+  position: 2,
 };
 
 // ----------------------------------------------------------------

@@ -11,7 +11,10 @@ import type {
   UpdateTaskPayload,
   MoveTaskPayload,
   TaskWithWorkspace,
+  TaskWithUsers,
+  TaskWithUsersAndWorkspace,
 } from './task.types.js';
+import { getInitials } from '../../utils/user.js';
 
 async function resolveTaskMembership(
   taskId: string,
@@ -37,6 +40,66 @@ async function resolveTaskMembership(
   return task as Task & { workspace_id: string };
 }
 
+interface TaskFromDb extends Task {
+  creator_name: string;
+  assignee_name: string | null;
+}
+
+function enrichTaskWithUsers(
+  task: TaskFromDb,
+  creatorName: string,
+  assigneeName: string | null,
+): TaskWithUsers {
+  const result: TaskWithUsers = {
+    ...(task as Task),
+    createdBy: {
+      id: task.created_by,
+      name: creatorName,
+      initials: getInitials(creatorName),
+    },
+  };
+
+  if (assigneeName && task.assignee_id) {
+    result.assignee = {
+      id: task.assignee_id,
+      name: assigneeName,
+      initials: getInitials(assigneeName),
+    };
+  }
+
+  return result;
+}
+
+async function getTaskWithUsers(
+  taskId: string,
+): Promise<TaskWithUsersAndWorkspace> {
+  const task = await db('tasks')
+    .join('columns', 'tasks.column_id', 'columns.id')
+    .leftJoin('users as creator', 'tasks.created_by', 'creator.id')
+    .leftJoin('users as assignee', 'tasks.assignee_id', 'assignee.id')
+    .where('tasks.id', taskId)
+    .select(
+      'tasks.*',
+      'columns.workspace_id',
+      'creator.name as creator_name',
+      'assignee.name as assignee_name',
+    )
+    .first();
+
+  if (!task) {
+    throw new AppError('Task not found', 404);
+  }
+
+  return {
+    ...enrichTaskWithUsers(
+      task as TaskFromDb,
+      task.creator_name || 'Unknown',
+      task.assignee_name,
+    ),
+    workspace_id: task.workspace_id,
+  };
+}
+
 // Monta o board com duas queries para evitar repetir dados das colunas.
 export async function getWorkspaceTasks(
   workspaceId: string,
@@ -53,15 +116,26 @@ export async function getWorkspaceTasks(
   const columnIds = columns.map((c: Column) => c.id);
 
   const tasks = await db('tasks')
+    .leftJoin('users as creator', 'tasks.created_by', 'creator.id')
+    .leftJoin('users as assignee', 'tasks.assignee_id', 'assignee.id')
     .whereIn('column_id', columnIds)
-    .orderBy('position', 'asc')
-    .select('*');
+    .orderBy('tasks.position', 'asc')
+    .select(
+      'tasks.*',
+      'creator.name as creator_name',
+      'assignee.name as assignee_name',
+    );
 
-  const taskByColumn = new Map<string, Task[]>();
+  const taskByColumn = new Map<string, TaskWithUsers[]>();
   columns.forEach((c: Column) => taskByColumn.set(c.id, []));
-  tasks.forEach((t: Task) => {
+  tasks.forEach((t: TaskFromDb) => {
+    const enriched = enrichTaskWithUsers(
+      t,
+      t.creator_name || 'Unknown',
+      t.assignee_name,
+    );
     const colTasks = taskByColumn.get(t.column_id);
-    if (colTasks) colTasks.push(t as Task);
+    if (colTasks) colTasks.push(enriched);
   });
 
   return columns.map((c: Column) => ({
@@ -90,7 +164,7 @@ export async function createTask(
   workspaceId: string,
   userId: string,
   payload: CreateTaskPayload,
-): Promise<Task> {
+): Promise<TaskWithUsersAndWorkspace> {
   // Impede criar tasks em colunas fora do workspace ou sem membership.
   const column = await db('columns')
     .join('workspace_members', function () {
@@ -115,7 +189,7 @@ export async function createTask(
 
   const maxPositionResult = await db('tasks')
     .where({ column_id: payload.columnId })
-    .max('position as maxPo')
+    .max('position as maxPos')
     .first();
 
   const nextPosition =
@@ -132,18 +206,19 @@ export async function createTask(
       priority: payload.priority ?? 'medium',
       due_date: payload.dueDate ?? null,
       assignee_id: payload.assigneeId ?? null,
+      created_by: userId,
       position: nextPosition,
     })
     .returning('*');
 
-  return newTask as Task;
+  return getTaskWithUsers((newTask as Task).id);
 }
 
 export async function updateTask(
   taskId: string,
   userId: string,
   payload: UpdateTaskPayload,
-): Promise<TaskWithWorkspace> {
+): Promise<TaskWithUsersAndWorkspace> {
   const task = await resolveTaskMembership(taskId, userId);
 
   if (payload.assigneeId !== undefined) {
@@ -162,15 +237,12 @@ export async function updateTask(
 
   updateData.updated_at = new Date().toISOString();
 
-  const [updatedTask] = await db('tasks')
+  await db('tasks')
     .where({ id: taskId })
     .update(updateData)
     .returning('*');
 
-  return {
-    ...(updatedTask as Task),
-    workspace_id: task.workspace_id,
-  };
+  return getTaskWithUsers(taskId);
 }
 
 // Move e reordena numa transacao para manter posicoes contiguas.
@@ -235,7 +307,7 @@ export async function moveTask(
 
       await trx('tasks')
         .where('column_id', payload.targetColumnId)
-        .andWhere('position', '>=', payload.newPosition)
+        .andWhere('position', '>=', clampedPosition)
         .increment('position', 1);
     }
 

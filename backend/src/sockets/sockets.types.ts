@@ -1,7 +1,7 @@
 // Contratos tipados dos eventos Socket.io e de socket.data.
 
 import { Server, Socket } from 'socket.io';
-import type { Task } from '../modules/tasks/task.types.js';
+import type { Task, TaskWithUsers } from '../modules/tasks/task.types.js';
 
 export interface AuthenticatedUser {
   id: string; // UUID do utilizador
@@ -58,8 +58,8 @@ export interface ServerToClientEvents {
     cursors: Array<{ userId: string; x: number; y: number }>;
   }) => void;
 
-  'task:created': (payload: { task: Task }) => void;
-  'task:updated': (payload: { task: Task }) => void;
+  'task:created': (payload: { task: Task | TaskWithUsers }) => void;
+  'task:updated': (payload: { task: Task | TaskWithUsers }) => void;
 
   'task:moved': (payload: {
     taskId: string;

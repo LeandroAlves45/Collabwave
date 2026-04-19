@@ -1,9 +1,20 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'node:url'
+import tailwindcss from '@tailwindcss/postcss'
 
 export default defineConfig({
   plugins: [react()],
+
+  /* ========== CONFIGURAÇÃO CSS (Tailwind v4) ========== */
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss(), // Plugin do Tailwind v4 via PostCSS
+      ],
+    },
+  },
+
   test: {
     globals: true,
     environment: 'jsdom',
@@ -28,12 +39,14 @@ export default defineConfig({
       },
     },
   },
+
   resolve: {
     /* Alias para imports mais limpos, ex: import Button from @components/ */
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+
   server: {
     port: 5173,
     proxy: {

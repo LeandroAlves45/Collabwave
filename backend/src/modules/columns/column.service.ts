@@ -32,6 +32,27 @@ async function resolveColumnMembership(
   return column as Column;
 }
 
+// Lista todas as colunas de um workspace para um utilizador membro.
+export async function getColumnsForWorkspace(
+  workspaceId: string,
+  userId: string,
+): Promise<Column[]> {
+  const isMember = await db('workspace_members')
+    .where({ workspace_id: workspaceId, user_id: userId })
+    .first();
+
+  if (!isMember) {
+    throw new AppError('Access denied to this workspace.', 403);
+  }
+
+  const columns = await db('columns')
+    .where({ workspace_id: workspaceId })
+    .orderBy('position', 'asc')
+    .select('*');
+
+  return columns as Column[];
+}
+
 // Cria a coluna no fim do board.
 export async function createColumn(
   workspaceId: string,

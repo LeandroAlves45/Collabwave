@@ -40,11 +40,6 @@ export const registerSchema = z
         passwordRegex,
         'Password deve ter pelo menos 8 caracteres e conter letras e números'
       ),
-    passwordConfirmation: z.string().min(1, 'Confirmação é obrigatória'),
-  })
-  .refine((data) => data.password === data.passwordConfirmation, {
-    message: 'Passwords não coincidem',
-    path: ['passwordConfirmation'],
   })
 
 // Type inferido automaticamente do schema para TypeScript

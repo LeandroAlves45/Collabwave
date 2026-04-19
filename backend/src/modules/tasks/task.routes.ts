@@ -13,7 +13,7 @@ async function requireMembership(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const workspaceId = req.params.id as string;
+    const workspaceId = req.params.workspaceId as string;
     const userId = req.user!.id;
 
     const membership = await checkMembership(workspaceId, userId);
@@ -31,17 +31,38 @@ async function requireMembership(
 export const workspaceScopedTaskRoutes = Router();
 
 workspaceScopedTaskRoutes.get(
-  '/:id/tasks',
+  '/:workspaceId/tasks',
   authenticate,
   requireMembership,
   taskController.getWorkspaceTasks,
 );
 
 workspaceScopedTaskRoutes.post(
-  '/:id/tasks',
+  '/:workspaceId/tasks',
   authenticate,
   requireMembership,
   taskController.createTask,
+);
+
+workspaceScopedTaskRoutes.patch(
+  '/:workspaceId/tasks/:taskId',
+  authenticate,
+  requireMembership,
+  taskController.updateTask,
+);
+
+workspaceScopedTaskRoutes.patch(
+  '/:workspaceId/tasks/:taskId/move',
+  authenticate,
+  requireMembership,
+  taskController.moveTask,
+);
+
+workspaceScopedTaskRoutes.delete(
+  '/:workspaceId/tasks/:taskId',
+  authenticate,
+  requireMembership,
+  taskController.deleteTask,
 );
 
 const taskRouter = Router();

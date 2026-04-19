@@ -1,98 +1,262 @@
-/* Import do Tailwind CSS com todas as variantes */
+/* ============================================================================
+   CollabWave Design System - v0 Color Palette
+   Dark mode only - Professional SaaS task management interface
+   ============================================================================ */
+
+/* Import Tailwind CSS v4 with all utilities */
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
-/* Fonts globais do Google */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=Syne:wght@700;800&display=swap');
+/* Custom dark mode variant */
+@custom-variant dark (&:is(.dark *));
 
-/* CSS custom properties para fonts */
+/* ============================================================================
+   CSS CUSTOM PROPERTIES - ROOT LEVEL
+   ============================================================================ */
+
 :root {
-  /* Font family variables referenciadas no tailwind.config.ts */
-  --font-dm-sans: 'DM Sans', system-ui, sans-serif;
-  --font-syne: 'Syne', system-ui, sans-serif;
+  /* ========== CollabWave v0 Color Palette (PRIMARY) ========== */
+  /* These are the NEW colors from v0 design system */
+  
+  --cw-base: #0D1520;       /* Darkest background - main app background */
+  --cw-surface: #131F2E;    /* Card/elevated surface background */
+  --cw-border: #1E3048;     /* All borders, dividers, separators */
+  --cw-muted: #4A6080;      /* Muted text, disabled states, placeholders */
+  --cw-secondary: #8AA4BF;  /* Secondary text, labels, metadata */
+  --cw-primary: #C8D8E8;    /* Primary text, headings, high-contrast content */
+  --cw-wave: #00D4AA;       /* Brand accent - buttons, links, highlights */
+  --cw-urgent: #F5A623;     /* Urgent priority, warnings */
+  --cw-danger: #FF6B6B;     /* Errors, destructive actions, delete buttons */
 
-  /* Cores do tema (duplicadas para acesso via CSS se necessário) */
-  --cw-base: #0d1520;
-  --cw-surface: #141b2b;
-  --cw-border: #242f42;
-  --cw-primary: #e8eaef;
-  --cw-secondary: #9ba3b0;
-  --cw-muted: #5f6b7a;
-  --cw-wave: #00d9ff;
-  --cw-urgent: #ff3b30;
+  /* ========== Compatibility Mapping (OLD → NEW) ========== */
+  /* These map old class names to new colors so existing components don't break */
+  /* Example: bg-cw-bg-primary will now render as #0D1520 instead of #08111c */
+  
+  --cw-bg-primary: var(--cw-base);         /* Old: #08111c → New: #0D1520 */
+  --cw-bg-secondary: var(--cw-surface);    /* Old: #101b2a → New: #131F2E */
+  --cw-text-primary: var(--cw-primary);    /* Old: #d9e9ff → New: #C8D8E8 */
+  --cw-text-secondary: var(--cw-secondary);/* Old: #9bb2ca → New: #8AA4BF */
+  --cw-text-muted: var(--cw-muted);        /* Old: #5e7894 → New: #4A6080 */
+  --cw-accent: var(--cw-wave);             /* Old: #09d6b4 → New: #00D4AA */
+  --cw-error: var(--cw-danger);            /* Map error to danger */
+
+  /* ========== Tailwind Semantic Token Mapping ========== */
+  /* These are used by shadcn/ui components and Tailwind utilities */
+  
+  --background: var(--cw-base);
+  --foreground: var(--cw-primary);
+  --card: var(--cw-surface);
+  --card-foreground: var(--cw-primary);
+  --popover: var(--cw-surface);
+  --popover-foreground: var(--cw-primary);
+  --primary: var(--cw-wave);
+  --primary-foreground: var(--cw-base);
+  --secondary: var(--cw-surface);
+  --secondary-foreground: var(--cw-secondary);
+  --muted: var(--cw-surface);
+  --muted-foreground: var(--cw-muted);
+  --accent: var(--cw-wave);
+  --accent-foreground: var(--cw-base);
+  --destructive: var(--cw-danger);
+  --destructive-foreground: var(--cw-base);
+  --border: var(--cw-border);
+  --input: var(--cw-border);
+  --ring: var(--cw-wave);
+  --radius: 0.375rem;
 }
 
-/* Reset e estilos globais */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ============================================================================
+   TAILWIND THEME INLINE CONFIGURATION
+   ============================================================================ */
+
+@theme inline {
+  /* ========== Font Families ========== */
+  --font-sans: 'DM Sans', 'DM Sans Fallback', system-ui, sans-serif;
+  --font-heading: 'Syne', 'Syne Fallback', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', monospace;
+
+  /* ========== CollabWave Color Classes ========== */
+  /* These allow usage like: bg-cw-base, text-cw-primary, border-cw-border */
+  
+  --color-cw-base: var(--cw-base);
+  --color-cw-surface: var(--cw-surface);
+  --color-cw-border: var(--cw-border);
+  --color-cw-muted: var(--cw-muted);
+  --color-cw-secondary: var(--cw-secondary);
+  --color-cw-primary: var(--cw-primary);
+  --color-cw-wave: var(--cw-wave);
+  --color-cw-urgent: var(--cw-urgent);
+  --color-cw-danger: var(--cw-danger);
+
+  /* ========== OLD Color Classes (Compatibility) ========== */
+  /* These allow old classes to still work with new colors */
+  
+  --color-cw-bg-primary: var(--cw-bg-primary);
+  --color-cw-bg-secondary: var(--cw-bg-secondary);
+  --color-cw-text-primary: var(--cw-text-primary);
+  --color-cw-text-secondary: var(--cw-text-secondary);
+  --color-cw-text-muted: var(--cw-text-muted);
+  --color-cw-accent: var(--cw-accent);
+  --color-cw-error: var(--cw-error);
+
+  /* ========== Semantic Color Classes ========== */
+  /* These map to Tailwind's semantic naming convention */
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* ========== Border Radius Utilities ========== */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
-html {
-  /* Scroll suave nos browsers que suportam */
-  scroll-behavior: smooth;
+/* ============================================================================
+   ANIMATIONS - CollabWave Design System
+   ============================================================================ */
+
+/* Wave Line Animation - Used in WaveLine component (auth cards, workspace cards) */
+@keyframes wave-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px var(--cw-wave);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 16px var(--cw-wave);
+  }
 }
 
-body {
-  /* Aplicar cores e fontes do tema */
-  background-color: var(--cw-base);
-  color: var(--cw-primary);
-  font-family: var(--font-dm-sans);
-  font-size: 16px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Presence Pulse Animation - Used in PresenceAvatar component */
+@keyframes presence-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
 }
 
-/* Scrollbar customizado (Chrome, Edge, Safari) */
-::-webkit-scrollbar {
+/* Task Flash Animation - Used when task is updated in real-time */
+@keyframes task-flash {
+  0%, 100% {
+    border-color: var(--cw-border);
+  }
+  50% {
+    border-color: var(--cw-wave);
+  }
+}
+
+/* Animation Utility Classes */
+.animate-wave-pulse {
+  animation: wave-pulse 3s ease-in-out infinite;
+}
+
+.animate-presence-pulse {
+  animation: presence-pulse 2s ease-in-out infinite;
+}
+
+.animate-task-flash {
+  animation: task-flash 0.6s ease-in-out;
+}
+
+/* ============================================================================
+   BASE STYLES - Global Resets and Defaults
+   ============================================================================ */
+
+@layer base {
+  /* Universal box-sizing and outline */
+  * {
+    @apply border-border outline-ring/50;
+  }
+  
+  /* Force dark color scheme for the entire app */
+  html {
+    color-scheme: dark;
+  }
+  
+  /* Body default background and text color */
+  body {
+    @apply bg-cw-base text-cw-primary antialiased;
+  }
+
+  /* ========== Custom Scrollbar Styling ========== */
+  /* Dark theme scrollbar - subtle and elegant */
+  
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--cw-base);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--cw-border);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--cw-muted);
+  }
+}
+
+/* ============================================================================
+   UTILITY CLASSES
+   ============================================================================ */
+
+/* Border Thin Utility - 0.5px borders as specified in v0 design */
+/* Usage: border-thin instead of border */
+.border-thin {
+  border-width: 0.5px;
+}
+
+/* ============================================================================
+   SCROLLBAR STYLING FOR SCROLLABLE ELEMENTS
+   ============================================================================ */
+
+/* Firefox scrollbar styling - applied to scrollable elements */
+main {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cw-border) var(--cw-base);
+}
+
+/* Ensure scrollbar is visible on overflow elements */
+*::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--cw-surface);
+*::-webkit-scrollbar-track {
+  background: var(--cw-base);
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: var(--cw-border);
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--cw-secondary);
-}
-
-/* Seleção de texto */
-::selection {
-  background-color: var(--cw-wave);
-  color: var(--cw-base);
-}
-
-/* Focus visível para acessibilidade */
-:focus-visible {
-  outline: 2px solid var(--cw-wave);
-  outline-offset: 2px;
-}
-
-/* Inputs e form elements */
-input,
-textarea,
-select {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-}
-
-/* Remove border padrão de buttons */
-button {
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-/* Links estilo padrão */
-a {
-  color: inherit;
-  text-decoration: none;
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--cw-muted);
 }

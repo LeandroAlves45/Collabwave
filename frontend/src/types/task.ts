@@ -4,6 +4,7 @@
 // Espelha o enum de prioridade da DB
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'
 
+// Tipo normalizado usado pelo frontend; respostas snake_case devem ser convertidas no ApiClient.
 // Task completa conforme guardada no backend
 export interface Task {
   id: string // ID da task
@@ -28,7 +29,8 @@ export interface Column {
 
 // Shape retornado por GET /api/workspaces/:id/tasks
 export interface ColumnWithTasks extends Column {
-  tasks: Task[] // Array de tasks dentro da coluna
+  // Pode vir enriquecido com dados do criador quando o backend inclui createdBy.
+  tasks: (Task | TaskWithUsers)[] // Array de tasks dentro da coluna
 }
 
 // Payload para POST /api/workspaces/:id/tasks para criar uma nova task
@@ -53,4 +55,17 @@ export interface UpdateTaskPayload {
 export interface MoveTaskPayload {
   targetColumnId: string // ID da coluna para onde a task será movida
   newPosition: number // Nova posição da task dentro da coluna para ordenação
+}
+
+export interface UserInfo {
+  // initials e calculado pelo backend para manter o avatar consistente entre clientes.
+  id: string
+  name: string
+  initials: string
+}
+
+export interface TaskWithUsers extends Task {
+  // Payload enriquecido usado em alguns eventos/respostas quando o backend inclui dados do criador.
+  createdBy: UserInfo
+  assignee?: UserInfo
 }

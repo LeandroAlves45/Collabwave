@@ -25,7 +25,8 @@ export interface RegisterPayload {
   name: string
   email: string
   password: string
-  passwordConfirmation: string
+  // Campo opcional para compatibilidade com testes/fluxos antigos de confirmacao.
+  passwordConfirmation?: string
 }
 
 // Payload enviado para o POST /api/auth/login
@@ -43,5 +44,6 @@ export interface AuthResponse {
 
 // Resposta de POST /api/auth/refresh
 export interface RefreshResponse {
+  // O refresh atual renova apenas o access token; refresh token continua guardado no authStore.
   accessToken: string // Novo JWT access token
 }

@@ -6,10 +6,22 @@ import * as columnController from './column.controller.js';
 
 export const workspaceScopedColumnRoutes = Router({ mergeParams: true });
 
+workspaceScopedColumnRoutes.get(
+  '/:workspaceId/columns',
+  authenticate,
+  columnController.getColumnsForWorkspace,
+);
+
 workspaceScopedColumnRoutes.post(
-  '/:id/columns',
+  '/:workspaceId/columns',
   authenticate,
   columnController.createColumn,
+);
+
+workspaceScopedColumnRoutes.delete(
+  '/:workspaceId/columns/:columnId',
+  authenticate,
+  columnController.deleteColumn,
 );
 
 export const columnRouter = Router();

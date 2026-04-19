@@ -17,25 +17,36 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    { variant = 'solid', size = 'md', isLoading = false, disabled, className, children, ...props },
+    {
+      variant = 'solid',
+      size = 'md',
+      isLoading = false,
+      disabled,
+      className,
+      children,
+      type = 'button', // Default type is "button" to prevent accidental form submissions
+      ...props
+    },
     ref
   ) => {
     /* Estilos base aplicados a todos os buttons */
-    const baseStyles = 'font-medium rounded transition-colors duration-200 focus-visible:ring-2'
+    const baseStyles =
+      'inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-cw-accent'
 
     /* Estilos por variante */
     const variantStyles: Record<ButtonVariant, string> = {
       solid:
-        'bg-cw-wave text-cw-base hover:bg-cw-wave/90 disabled:bg-cw-border disabled:text-cw-muted',
-      ghost: 'bg-transparent text-cw-primary hover:bg-cw-surface disabled:text-cw-muted',
+        'bg-cw-accent text-[#041119] hover:bg-cw-accent/90 disabled:bg-cw-border disabled:text-cw-text-muted',
+      ghost:
+        'bg-transparent text-cw-text-primary hover:bg-cw-bg-secondary disabled:text-cw-text-muted',
       outline:
-        'border border-cw-border text-cw-primary hover:bg-cw-surface disabled:border-cw-muted disabled:text-cw-muted',
+        'border border-cw-border text-cw-text-primary hover:bg-cw-bg-secondary disabled:border-cw-text-muted disabled:text-cw-text-muted',
     }
 
     /* Estilos por tamanho */
     const sizeStyles: Record<ButtonSize, string> = {
       sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
+      md: 'h-9 px-4 text-sm',
       lg: 'px-6 py-3 text-lg',
       'icon-sm': 'w-6 h-6 flex items-center justify-center p-0',
     }
@@ -53,7 +64,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     )
 
     return (
-      <button ref={ref} disabled={disabled || isLoading} className={buttonClassName} {...props}>
+      <button
+        ref={ref}
+        type={type}
+        disabled={disabled || isLoading}
+        className={buttonClassName}
+        {...props}
+      >
         {/* Se isLoading, mostra spinner simples*/}
         {isLoading ? <span className="inline-block animate-spin">⟳</span> : children}
       </button>

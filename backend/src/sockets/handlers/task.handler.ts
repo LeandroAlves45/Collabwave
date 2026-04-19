@@ -7,6 +7,11 @@ function buildRoomName(workspaceId: string): string {
   return `workspace:${workspaceId}`;
 }
 
+function toTaskResponse<T extends { workspace_id: string }>(task: T) {
+  const { workspace_id: _workspaceId, ...taskResponse } = task;
+  return taskResponse;
+}
+
 export function registerTaskHandler(
   io: CollabWaveServer,
   socket: CollabWaveSocket,
@@ -52,7 +57,7 @@ export function registerTaskHandler(
       });
 
       const room = buildRoomName(payload.workspaceId);
-      io.to(room).emit('task:created', { task });
+      io.to(room).emit('task:created', { task: toTaskResponse(task) });
 
       console.log(`[TASK] task:created by ${user.email} - taskId: ${task.id}`);
     } catch (error) {
@@ -105,7 +110,7 @@ export function registerTaskHandler(
 
       const room = buildRoomName(task.workspace_id);
 
-      io.to(room).emit('task:updated', { task });
+      io.to(room).emit('task:updated', { task: toTaskResponse(task) });
 
       console.log(`[TASK] task:updated by ${user.email} - taskId: ${task.id}`);
     } catch (error) {
@@ -165,7 +170,7 @@ export function registerTaskHandler(
       io.to(room).emit('task:moved', {
         taskId: task.id,
         targetColumnId: task.column_id,
-        newPosition: payload.newPosition,
+        newPosition: task.position,
         movedBy: user.id,
       });
 

@@ -7,21 +7,36 @@ export interface Column {
   position: number;
 }
 
+export interface UserInfo {
+  id: string;
+  name: string;
+  initials: string;
+}
+
 export interface Task {
-  id: string; // UUID
-  column_id: string; // UUID da coluna
+  id: string;
+  column_id: string;
   title: string;
   description: string | null;
   assignee_id: string | null;
+  created_by: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   due_date: string | null;
   position: number;
+  created_at: string;
   updated_at: string;
+}
+
+export interface TaskWithUsers extends Task {
+  createdBy: UserInfo;
+  assignee?: UserInfo;
 }
 
 export interface TaskWithWorkspace extends Task {
   workspace_id: string;
 }
+
+export type TaskWithUsersAndWorkspace = TaskWithUsers & { workspace_id: string };
 
 export interface DeletedTaskContext {
   taskId: string;
@@ -29,7 +44,7 @@ export interface DeletedTaskContext {
 }
 
 export interface ColumnWithTasks extends Column {
-  tasks: Task[];
+  tasks: (Task | TaskWithUsers)[];
 }
 
 export interface CreateTaskPayload {

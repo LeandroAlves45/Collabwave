@@ -24,7 +24,7 @@ import db from '../../src/config/database.js';
 function buildMock(resolvedValue: unknown) {
   const qb: Record<string, jest.Mock> = {};
   const methods = [
-    'where', 'andWhere', 'whereIn', 'join', 'select', 'insert',
+    'where', 'andWhere', 'whereIn', 'join', 'leftJoin', 'select', 'insert',
     'update', 'delete', 'returning', 'first', 'orderBy', 'max',
     'count', 'increment', 'decrement', 'on', 'andOnVal',
   ];
@@ -48,6 +48,17 @@ function buildMock(resolvedValue: unknown) {
 const mockDb = db as unknown as jest.MockedFunction<typeof db> & {
   transaction: jest.Mock;
 };
+
+function withUserData(task: Record<string, unknown>) {
+  return {
+    ...task,
+    workspace_id: task.workspace_id ?? 'ws-1',
+    created_by: task.created_by ?? 'user-1',
+    created_at: task.created_at ?? '2024-01-01T00:00:00.000Z',
+    creator_name: 'Test User',
+    assignee_name: null,
+  };
+}
  
 // ----------------------------------------------------------------
 // SUITE: createTask
@@ -76,16 +87,23 @@ describe('createTask', () => {
       priority: 'medium',
       description: null,
       assignee_id: null,
+      created_by: userId,
+      created_at: '2024-01-01T00:00:00.000Z',
       due_date: null,
       updated_at: new Date().toISOString(),
     };
     const insertQb = buildMock([newTask]);
     insertQb['returning'] = jest.fn().mockResolvedValue([newTask]);
+    const enrichedTaskQb = buildMock(withUserData(newTask));
+    enrichedTaskQb['first'] = jest
+      .fn()
+      .mockResolvedValue(withUserData(newTask));
  
     (mockDb as unknown as jest.Mock)
       .mockReturnValueOnce(columnQb)  // db('columns').join...
       .mockReturnValueOnce(maxQb)     // db('tasks').max...
-      .mockReturnValueOnce(insertQb); // db('tasks').insert...
+      .mockReturnValueOnce(insertQb)  // db('tasks').insert...
+      .mockReturnValueOnce(enrichedTaskQb); // db('tasks').join...
  
     const result = await taskService.createTask(workspaceId, userId, payload);
  
@@ -107,15 +125,21 @@ describe('createTask', () => {
     const newTask = {
       id: 'task-3', column_id: 'col-1', title: 'Task 3', position: 2,
       priority: 'medium', description: null, assignee_id: null,
+      created_by: userId, created_at: '2024-01-01T00:00:00.000Z',
       due_date: null, updated_at: new Date().toISOString(),
     };
     const insertQb = buildMock([newTask]);
     insertQb['returning'] = jest.fn().mockResolvedValue([newTask]);
+    const enrichedTaskQb = buildMock(withUserData(newTask));
+    enrichedTaskQb['first'] = jest
+      .fn()
+      .mockResolvedValue(withUserData(newTask));
  
     (mockDb as unknown as jest.Mock)
       .mockReturnValueOnce(columnQb)
       .mockReturnValueOnce(maxQb)
-      .mockReturnValueOnce(insertQb);
+      .mockReturnValueOnce(insertQb)
+      .mockReturnValueOnce(enrichedTaskQb);
  
     const result = await taskService.createTask(workspaceId, userId, payload);
  
@@ -165,7 +189,8 @@ describe('updateTask', () => {
     const task = {
       id: 'task-1', column_id: 'col-1', workspace_id: 'ws-1',
       title: 'Título original', priority: 'medium', position: 0,
-      description: null, assignee_id: null, due_date: null,
+      description: null, assignee_id: null, created_by: 'user-1',
+      created_at: '2024-01-01T00:00:00.000Z', due_date: null,
       updated_at: '2024-01-01T00:00:00.000Z',
     };
  
@@ -177,10 +202,15 @@ describe('updateTask', () => {
     const updatedTask = { ...task, title: 'Título novo' };
     const updateQb = buildMock([updatedTask]);
     updateQb['returning'] = jest.fn().mockResolvedValue([updatedTask]);
+    const enrichedTaskQb = buildMock(withUserData(updatedTask));
+    enrichedTaskQb['first'] = jest
+      .fn()
+      .mockResolvedValue(withUserData(updatedTask));
  
     (mockDb as unknown as jest.Mock)
       .mockReturnValueOnce(resolveQb)
-      .mockReturnValueOnce(updateQb);
+      .mockReturnValueOnce(updateQb)
+      .mockReturnValueOnce(enrichedTaskQb);
  
     const result = await taskService.updateTask('task-1', 'user-1', {
       title: 'Título novo',
