@@ -7,6 +7,12 @@
     "lint:backend": "npm run lint --prefix backend",
     "lint:frontend": "npm run lint --prefix frontend",
     "lint": "npm run lint:backend && npm run lint:frontend",
+    "test:backend": "npm run test:ci --prefix backend",
+    "test:frontend": "npm run test --prefix frontend",
+    "test:ci": "npm run test:backend && npm run test:frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build": "npm run build:backend && npm run build:frontend",
     "prepare": "husky"
   },
   "devDependencies": {
