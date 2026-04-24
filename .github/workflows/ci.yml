@@ -25,6 +25,39 @@ jobs:
     name: Lint, Test and Build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: collabwave
+          POSTGRES_USER: collabwave_user
+          POSTGRES_PASSWORD: collabwave_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U collabwave_user -d collabwave"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Variáveis de ambiente para os testes
+      DATABASE_URL: postgres://collabwave_user:collabwave_pass@localhost:5432/collabwave
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret
+      JWT_REFRESH_SECRET: test-refresh-secret
+      NODE_ENV: test
+
     # STEPS - etapas do trabalho
     steps:
       # Checkout do código-fonte
@@ -55,6 +88,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
         working-directory: frontend
+
+      # Execução das migrations
+      - name: Run backend migrations
+        run: npm run migrate
+        working-directory: backend
 
       # Execução do lint
       - name: Run ESLint
