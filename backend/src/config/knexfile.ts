@@ -49,7 +49,21 @@ const config: Record<string, Knex.Config> = {
     },
     debug: false,
   },
+  test: {
+    client: 'pg',
+    connection: {
+      connectionString: process.env.DATABASE_URL,
+      ssl: false,
+    },
+    pool: { min: 2, max: 10 },
+    migrations: {
+      directory: '../../migrations',
+      extension: 'ts',
+      tableName: 'knex_migrations',
+    },
+    debug: false,
+  },
 };
 
 // O Knex espera exportacao CommonJS neste arquivo de configuracao.
-module.exports = config[process.env.NODE_ENV || 'development'];
+module.exports = config;
