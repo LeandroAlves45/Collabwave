@@ -500,9 +500,14 @@ describe('ApiClient', () => {
    * - GET to /workspaces/:id/tasks
    */
   it('should make GET request to /workspaces/:id/tasks', async () => {
+    const mockTaskColumn = {
+      ...mockColumn,
+      tasks: [mockTask],
+    }
+
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ status: 'success', data: [mockTask] }),
+      json: async () => ({ status: 'success', data: [mockTaskColumn] }),
     })
 
     const workspaceId = 'workspace-123'

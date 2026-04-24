@@ -75,10 +75,10 @@ export function RegisterPage(): ReactElement {
    * 6. Se erro: hook mostra mensagem via error state
    */
   const onSubmit = async (data: RegisterFormData): Promise<void> => {
-    // O schema atual nao tem confirmacao de password; se o campo voltar, atualizar schema e UI juntos.
-    // Chama método register do hook
-    // Internamente: ApiClient.register() + setAuth() + SocketService.connect()
-    await registerUser(data)
+    const { name, email, password } = data
+
+    // A confirmacao e validada localmente pelo schema; a API precisa apenas do payload base.
+    await registerUser({ name, email, password })
   }
 
   return (
@@ -171,6 +171,28 @@ export function RegisterPage(): ReactElement {
               />
               {errors.password && (
                 <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>
+              )}
+            </div>
+
+            {/* Password confirmation */}
+            <div>
+              <label
+                htmlFor="passwordConfirmation"
+                className="mb-2 block text-sm font-medium text-cw-text-secondary"
+              >
+                Confirm password
+              </label>
+              <PasswordInput
+                id="passwordConfirmation"
+                placeholder="Confirm your password"
+                {...registerField('passwordConfirmation')}
+                className={errors.passwordConfirmation ? 'border-red-500' : ''}
+                disabled={isLoading}
+              />
+              {errors.passwordConfirmation && (
+                <p className="mt-1 text-sm text-red-500">
+                  {errors.passwordConfirmation.message}
+                </p>
               )}
             </div>
 

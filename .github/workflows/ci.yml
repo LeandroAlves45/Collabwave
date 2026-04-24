@@ -60,6 +60,16 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      # Instala as dependências do Playwright, incluindo os navegadores necessários para os testes E2E
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: frontend
+
+      # Executa os testes E2E com Playwright
+      - name: Run E2E tests
+        run: npm run test:e2e
+        working-directory: frontend
+
       # Execução dos testes com coverage
       - name: Run tests with coverage
         run: npm run test:ci

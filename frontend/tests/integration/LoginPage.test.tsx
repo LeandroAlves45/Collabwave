@@ -108,7 +108,7 @@ describe('LoginPage', () => {
     expect(emailInput).toBeInTheDocument()
 
     // ASSERT: Password input is present
-    const passwordInput = screen.getByLabelText(/password/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     expect(passwordInput).toBeInTheDocument()
     expect(passwordInput).toHaveAttribute('type', 'password')
 
@@ -141,7 +141,7 @@ describe('LoginPage', () => {
 
     // Get form elements
     const emailInput = screen.getByRole('textbox', { name: /email/i })
-    const passwordInput = screen.getByLabelText(/password/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     const submitButton = screen.getByRole('button', {
       name: /entrar|login|sign in|signing in/i,
     })
@@ -178,7 +178,7 @@ describe('LoginPage', () => {
 
     // Get form elements
     const emailInput = screen.getByRole('textbox', { name: /email/i })
-    const passwordInput = screen.getByLabelText(/password/i)
+    const passwordInput = screen.getByLabelText(/^password$/i)
     const submitButton = screen.getByRole('button', {
       name: /entrar|login|sign in|signing in/i,
     })

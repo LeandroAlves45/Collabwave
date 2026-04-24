@@ -22,6 +22,7 @@ test.describe('Authentication Flows', () => {
     await page.getByLabel('Full name').fill('New E2E User')
     await page.getByLabel('Email').fill(uniqueEmail('register'))
     await page.locator('#password').fill(PASSWORD)
+    await page.locator('#passwordConfirmation').fill(PASSWORD)
     await page.getByRole('button', { name: /create account/i }).click()
 
     await expect(page).toHaveURL(/\/$/, { timeout: 15000 })

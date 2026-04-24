@@ -399,23 +399,16 @@ describe('BoardPage', () => {
       expect(screen.getByText('To Do')).toBeInTheDocument()
     })
 
-    // Find the "To Do" column and get the add task button inside it
-    const columnContainer = screen.getByTestId('board-column-col-1')
+    const addTaskButtons = screen.getAllByRole('button', { name: /add task/i })
+    await user.click(addTaskButtons[0])
 
-    // Get all buttons in this column
-    const columnButtons = columnContainer.querySelectorAll('button')
-    if (columnButtons.length === 0) {
-      throw new Error('No buttons found in column')
-    }
-
-    // Click the button (should be the plus button)
-    const plusButton = columnButtons[columnButtons.length - 1]
-    await user.click(plusButton)
-
-    // ASSERT: Modal is open - look for form fields
     await waitFor(() => {
-      expect(screen.getByText('Criar Nova Task')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /add task/i })).toBeInTheDocument()
     }, { timeout: 2000 })
+
+    expect(screen.getByPlaceholderText('Task title')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Description (optional)')).toBeInTheDocument()
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
   })
 
   /**
@@ -432,26 +425,17 @@ describe('BoardPage', () => {
       expect(screen.getByText('To Do')).toBeInTheDocument()
     })
 
-    // Open modal - find column and click add task button
-    const columnContainer = screen.getByTestId('board-column-col-1')
-
-    const columnButtons = columnContainer.querySelectorAll('button')
-    const plusButton = columnButtons[columnButtons.length - 1]
-    await user.click(plusButton)
+    const addTaskButtons = screen.getAllByRole('button', { name: /add task/i })
+    await user.click(addTaskButtons[0])
 
     // Wait for modal to open
     await waitFor(() => {
-      expect(screen.getByText('Criar Nova Task')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /add task/i })).toBeInTheDocument()
     })
 
-    // Try to submit without filling title
-    const allButtons = screen.getAllByRole('button')
-    const submitButton = allButtons.find(btn => btn.textContent?.trim() === 'Criar')
-    if (!submitButton) throw new Error('Submit button not found')
-    await user.click(submitButton)
+    const createButton = screen.getByRole('button', { name: /^create$/i })
+    expect(createButton).toBeDisabled()
 
-    // ASSERT: API was NOT called (validation prevented submission)
-    await new Promise(resolve => setTimeout(resolve, 100)) // Brief wait
     expect(ApiClient.createTask).not.toHaveBeenCalled()
   })
 
@@ -483,29 +467,24 @@ describe('BoardPage', () => {
       expect(screen.getByText('To Do')).toBeInTheDocument()
     })
 
-    // Open modal - find column and click add task button
-    const columnContainer = screen.getByTestId('board-column-col-1')
-
-    const columnButtons = columnContainer.querySelectorAll('button')
-    const plusButton = columnButtons[columnButtons.length - 1]
-    await user.click(plusButton)
+    const addTaskButtons = screen.getAllByRole('button', { name: /add task/i })
+    await user.click(addTaskButtons[0])
 
     // Wait for modal to open
     await waitFor(() => {
-      expect(screen.getByText('Criar Nova Task')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: /add task/i })).toBeInTheDocument()
     })
 
-    // Find and fill form inputs
-    const inputs = screen.getAllByRole('textbox')
-    if (inputs.length < 2) throw new Error('Not enough input fields found')
+    const titleInput = screen.getByPlaceholderText('Task title')
+    const descriptionInput = screen.getByPlaceholderText('Description (optional)')
+    const prioritySelect = screen.getByRole('combobox')
 
-    await user.type(inputs[0], 'New API Task') // Title
-    await user.type(inputs[1], 'New Description') // Description
+    await user.type(titleInput, 'New API Task')
+    await user.type(descriptionInput, 'New Description')
+    await user.selectOptions(prioritySelect, 'high')
 
     // Submit
-    const allButtons = screen.getAllByRole('button')
-    const submitButton = allButtons.find(btn => btn.textContent?.trim() === 'Criar')
-    if (!submitButton) throw new Error('Submit button not found')
+    const submitButton = screen.getByRole('button', { name: /^create$/i })
     await user.click(submitButton)
 
     // ASSERT: API was called
@@ -513,8 +492,10 @@ describe('BoardPage', () => {
       expect(ApiClient.createTask).toHaveBeenCalledWith(
         mockWorkspaceId,
         expect.objectContaining({
+          columnId: 'col-1',
           title: 'New API Task',
           description: 'New Description',
+          priority: 'high',
         })
       )
     })

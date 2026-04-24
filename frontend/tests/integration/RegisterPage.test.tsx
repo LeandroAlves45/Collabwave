@@ -118,6 +118,10 @@ describe('RegisterPage', () => {
     expect(passwordInput).toBeInTheDocument()
     expect(passwordInput).toHaveAttribute('type', 'password')
 
+    const passwordConfirmationInput = screen.getByLabelText(/confirm password/i)
+    expect(passwordConfirmationInput).toBeInTheDocument()
+    expect(passwordConfirmationInput).toHaveAttribute('type', 'password')
+
     // ASSERT: Submit button is present
     const submitButton = screen.getByRole('button', {
       name: /criar conta|registar|register|create account|creating account/i,
@@ -149,6 +153,7 @@ describe('RegisterPage', () => {
     const nameInput = screen.getByRole('textbox', { name: /nome|name/i })
     const emailInput = screen.getByRole('textbox', { name: /email/i })
     const passwordInput = screen.getByLabelText(/^password|palavra-passe$/i)
+    const passwordConfirmationInput = screen.getByLabelText(/confirm password/i)
     const submitButton = screen.getByRole('button', {
       name: /criar conta|registar|register|create account|creating account/i,
     })
@@ -190,6 +195,7 @@ describe('RegisterPage', () => {
     const nameInput = screen.getByRole('textbox', { name: /nome|name/i })
     const emailInput = screen.getByRole('textbox', { name: /email/i })
     const passwordInput = screen.getByLabelText(/^password|palavra-passe$/i)
+    const passwordConfirmationInput = screen.getByLabelText(/confirm password/i)
     const submitButton = screen.getByRole('button', {
       name: /criar conta|registar|register|create account|creating account/i,
     })
@@ -198,6 +204,7 @@ describe('RegisterPage', () => {
     await user.type(nameInput, 'John Doe')
     await user.type(emailInput, 'john@example.com')
     await user.type(passwordInput, 'Password123')
+    await user.type(passwordConfirmationInput, 'Password123')
     await user.click(submitButton)
 
     // ASSERT: register() was called with correct payload

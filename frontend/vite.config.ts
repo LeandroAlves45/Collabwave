@@ -22,11 +22,12 @@ export default defineConfig({
     include: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
-      'tests/**/*.test.ts',
-      'tests/**/*.test.tsx',
-      'tests/**/*.spec.ts',
+      'tests/unit/**/*.test.ts',
+      'tests/unit/**/*.test.tsx',
+      'tests/integration/**/*.test.ts',
+      'tests/integration/**/*.test.tsx',
     ],
-    exclude: ['node_modules/', 'dist/'],
+    exclude: ['node_modules/', 'dist/', 'tests/E2E/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
