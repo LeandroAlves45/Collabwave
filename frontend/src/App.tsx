@@ -7,11 +7,17 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { WorkspacesPage } from "./pages/WorkspacesPage";
 import { BoardPage } from "./pages/BoardPage";
+import { useAuth } from "./hooks/useAuth";
 
 // ProtectedRoute é uma layout route sem path
 // Lê o estado de autenticação do store e redireciona se não houver utilizador 
 function ProtectedRoute(): ReactElement {
   const user = useAuthStore((state) => state.user)
+  const isSessionInitialized = useAuthStore((state) => state.isSessionInitialized)
+
+  if (!isSessionInitialized) {
+    return <div role="status">A restaurar sessão...</div>
+  }
 
   if (!user) {
     // replace: true evita que /login fique no histórico do navegação
@@ -22,6 +28,8 @@ function ProtectedRoute(): ReactElement {
 }
 
 export function App(): ReactElement {
+  useAuth()
+
   return (
     <BrowserRouter>
       <Routes>

@@ -36,6 +36,8 @@ Desktop.ini
 .vscode/*
 .vscode/settings.json
 .vscode/extensions.json
+.vscode/launch.json
+.vscode/tasks.json
 .idea/
 *.swp
 *.swo
@@ -46,4 +48,13 @@ Desktop.ini
 .eslintcache
 .npm/
 
+# docs
+docs/
+
+# Ferramentas locais e artefactos de testes
 .qodo/
+playwright-report/
+test-results/
+blob-report/
+frontend/playwright-report/
+frontend/test-results/

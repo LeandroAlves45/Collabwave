@@ -1,6 +1,6 @@
 // Rotas de auth com rate limiting nos endpoints sensiveis.
 
-import { Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
   registerController,
@@ -9,8 +9,29 @@ import {
   logoutController,
 } from './auth.controller';
 import { env } from '../../config/env';
+import { AppError } from '../../middleware/errorHandler';
 
 const router = Router();
+
+function validateCookieOrigin(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  const origin = req.get('origin');
+
+  // Browsers always send Origin for the cross-origin requests that matter here.
+  // Missing Origin remains accepted outside production for tests and CLI clients.
+  if (
+    (!origin && env.NODE_ENV === 'production') ||
+    (origin && !env.CORS_ORIGINS.includes(origin))
+  ) {
+    next(new AppError('Request origin is not allowed', 403));
+    return;
+  }
+
+  next();
+}
 
 const authRateLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
@@ -23,9 +44,9 @@ const authRateLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-router.post('/register', authRateLimiter, registerController);
-router.post('/login', authRateLimiter, loginController);
-router.post('/refresh', refreshController);
-router.post('/logout', logoutController);
+router.post('/register', authRateLimiter, validateCookieOrigin, registerController);
+router.post('/login', authRateLimiter, validateCookieOrigin, loginController);
+router.post('/refresh', validateCookieOrigin, refreshController);
+router.post('/logout', validateCookieOrigin, logoutController);
 
 export default router;

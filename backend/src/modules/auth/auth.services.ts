@@ -12,43 +12,16 @@ import type {
   SafeUser,
   RegisterPayload,
   LoginPayload,
-  AuthResponse,
+  AuthSession,
   JwtAccessPayload,
   JwtRefreshPayload,
 } from './auth.types';
+import { REFRESH_TOKEN_TTL_SECONDS } from './auth.cookies';
 
 // Custo do bcrypt: mais alto aumenta seguranca e custo de CPU.
 const BCRYPT_ROUNDS = 12;
 
 const REFRESH_TOKEN_PREFIX = 'refresh_token:';
-
-const DURATION_UNITS_IN_SECONDS: Record<string, number> = {
-  s: 1,
-  m: 60,
-  h: 60 * 60,
-  d: 24 * 60 * 60,
-};
-
-function parseDurationToSeconds(value: string): number {
-  const numericValue = Number(value);
-
-  if (Number.isFinite(numericValue)) {
-    return numericValue;
-  }
-
-  const match = value.trim().match(/^(\d+)([smhd])$/);
-
-  if (!match) {
-    throw new Error(`Invalid JWT_REFRESH_EXPIRES_IN value: ${value}`);
-  }
-
-  const [, amount, unit] = match;
-  return Number(amount) * DURATION_UNITS_IN_SECONDS[unit];
-}
-
-const REFRESH_TOKEN_TTL_SECONDS = parseDurationToSeconds(
-  env.JWT_REFRESH_EXPIRES_IN,
-);
 
 function generateAccessToken(
   userId: string,
@@ -92,7 +65,7 @@ function sanitizeUser(user: User): SafeUser {
 
 export async function register(
   payload: RegisterPayload,
-): Promise<AuthResponse> {
+): Promise<AuthSession> {
   const { name, email, password } = payload;
 
   const existingUser = await db('users').where({ email }).first();
@@ -120,7 +93,7 @@ export async function register(
   };
 }
 
-export async function login(payload: LoginPayload): Promise<AuthResponse> {
+export async function login(payload: LoginPayload): Promise<AuthSession> {
   const { email, password } = payload;
 
   const user = await db('users').where({ email }).first();
@@ -152,7 +125,7 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
 // Valida o refresh token, invalida o antigo e emite um novo par.
 export async function refresh(
   token: string,
-): Promise<AuthResponse> {
+): Promise<AuthSession> {
   let decoded: JwtRefreshPayload;
 
   try {

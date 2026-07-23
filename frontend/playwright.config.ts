@@ -86,12 +86,12 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run dev --prefix ../backend',
-      url: 'http://localhost:3001/health',
+      url: 'http://localhost:3001/health/ready',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000, // 2 minutes to start dev server
       env: {
         PORT: '3001',
-        CORS_ORIGIN: 'http://localhost:5173',
+        CORS_ORIGINS: 'http://localhost:5173',
         RATE_LIMIT_MAX_REQUESTS: '1000',
       },
     },
@@ -101,7 +101,6 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000, // 2 minutes to start dev server
       env: {
-        VITE_API_URL: 'http://localhost:3001/api',
         VITE_SOCKET_URL: 'http://localhost:3001',
       },
     },

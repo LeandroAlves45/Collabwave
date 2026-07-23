@@ -46,7 +46,7 @@ export function LoginPage(): ReactElement {
    * Fluxo (tudo gerido pelo useAuth hook):
    * 1. Chama login({ email, password })
    * 2. Hook faz POST /auth/login
-   * 3. Hook armazena tokens no authStore (user, accessToken, refreshToken)
+   * 3. Hook mantém user e accessToken apenas em memória
    * 4. Hook conecta Socket.io automaticamente
    * 5. Hook atualiza isAuthenticated para true
    * 6. Se erro: hook mostra mensagem via error state (não navega)

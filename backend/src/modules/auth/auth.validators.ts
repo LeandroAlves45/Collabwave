@@ -38,12 +38,5 @@ export const loginSchema = z.object({
     .max(100, { message: 'Password must be at most 100 characters' }),
 });
 
-export const refreshSchema = z.object({
-  refreshToken: z
-    .string({ required_error: 'Refresh token is required' })
-    .min(1, { message: 'Refresh token is required' }),
-});
-
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
-export type RefreshInput = z.infer<typeof refreshSchema>;

@@ -1,44 +1,90 @@
-// Entry point HTTP: cria o http.Server usado pelo Express e Socket.io.
-// Mantem app.ts importavel em testes sem abrir porta real.
-
-import http from 'http';
+import http, { type Server } from 'http';
 import app from './app';
 import { env } from './config/env';
 import db from './config/database';
-import { initSocketServer } from './sockets';
+import { pubClient, redisClient, subClient } from './config/redis';
+import { closeSocketServer, initSocketServer } from './sockets';
 
-async function startServer(): Promise<void> {
-  try {
-    // Falha cedo se a base de dados nao estiver disponivel.
-    await db.raw('SELECT 1');
-    console.log('[DATABASE] Database connection established successfully.');
+let httpServer: Server | undefined;
+let shutdownPromise: Promise<void> | undefined;
 
-    // Socket.io precisa do mesmo http.Server para gerir upgrades WebSocket.
-    const httpServer = http.createServer(app);
+export async function startServer(): Promise<Server> {
+  await Promise.all([db.raw('SELECT 1'), redisClient.ping()]);
 
-    initSocketServer(httpServer);
-    console.log('[SOCKET.IO] Socket.io server initialized successfully.');
+  httpServer = http.createServer(app);
+  initSocketServer(httpServer);
 
-    httpServer.listen(env.PORT, () => {
-      console.log(`[SERVER] Server is running on port ${env.PORT}`);
-      console.log(`[SERVER] Environment: ${env.NODE_ENV}`);
-      console.log(`[SERVER] Health check: http://localhost:${env.PORT}/health`);
+  await new Promise<void>((resolve, reject) => {
+    httpServer!.once('error', reject);
+    httpServer!.listen(env.PORT, () => {
+      httpServer!.off('error', reject);
+      resolve();
     });
+  });
+
+  console.log(`[SERVER] Listening on port ${env.PORT} (${env.NODE_ENV})`);
+  return httpServer;
+}
+
+async function closeRedisClients(): Promise<void> {
+  await Promise.all(
+    [redisClient, pubClient, subClient].map(async (client) => {
+      if (client.status === 'end') return;
+      if (client.status === 'wait') {
+        client.disconnect();
+        return;
+      }
+      await client.quit();
+    }),
+  );
+}
+
+export function shutdown(reason: string): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+
+  shutdownPromise = (async () => {
+    console.log(`[SERVER] Graceful shutdown started: ${reason}`);
+
+    const closeHttp = httpServer
+      ? new Promise<void>((resolve, reject) => {
+          httpServer!.close((error) => (error ? reject(error) : resolve()));
+        })
+      : Promise.resolve();
+
+    await closeSocketServer();
+    await closeHttp;
+    await db.destroy();
+    await closeRedisClients();
+    console.log('[SERVER] Graceful shutdown completed');
+  })();
+
+  return shutdownPromise;
+}
+
+async function shutdownAndExit(signal: string): Promise<void> {
+  const timeout = new Promise<never>((_, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Graceful shutdown timed out')),
+      env.SHUTDOWN_TIMEOUT_MS,
+    );
+    timer.unref();
+  });
+
+  try {
+    await Promise.race([shutdown(signal), timeout]);
+    process.exit(0);
   } catch (error) {
-    console.error('[SERVER] Failed to start server:', error);
+    console.error('[SERVER] Shutdown failed:', error);
     process.exit(1);
   }
 }
 
-// Encerrar em erros globais evita manter o processo em estado desconhecido.
-process.on('uncaughtException', (error) => {
-  console.error('[SERVER] Uncaught Exception:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  process.once('SIGTERM', () => void shutdownAndExit('SIGTERM'));
+  process.once('SIGINT', () => void shutdownAndExit('SIGINT'));
 
-process.on('unhandledRejection', (reason) => {
-  console.error('[SERVER] Unhandled Promise Rejection:', reason);
-  process.exit(1);
-});
-
-startServer();
+  startServer().catch((error) => {
+    console.error('[SERVER] Failed to start:', error);
+    void shutdownAndExit('startup failure');
+  });
+}

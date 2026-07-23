@@ -22,9 +22,9 @@ import type {
 import { useAuthStore } from '@/stores/authStore'
 
 // URL base do backend (variável de ambiente do Vite ou fallback local)
-const API_BASE_URL =
-  (import.meta as unknown as { env: { VITE_API_URL?: string } }).env?.VITE_API_URL ||
-  'http://localhost:3001/api'
+const API_BASE_URL = '/api'
+
+let refreshPromise: Promise<AuthResponse> | null = null
 
 // Tipo de resposta padrão do backend
 // Todos os endpoints retornam: { status, data: T, message? }
@@ -151,7 +151,8 @@ class ApiClient {
     endpoint: string,
     method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
     body?: unknown,
-    token?: string
+    token?: string,
+    allowRefresh = true
   ): Promise<T> {
     // Constrói a URL completa
     const url = `${API_BASE_URL}${endpoint}`
@@ -172,7 +173,13 @@ class ApiClient {
         method,
         headers,
         body: body ? JSON.stringify(body) : undefined,
+        credentials: 'include',
       })
+
+      if (response.status === 401 && token && allowRefresh) {
+        const session = await this.refreshSession()
+        return this.request<T>(endpoint, method, body, session.accessToken, false)
+      }
 
       // 204 No Content não tem body, retorna void sem parsing
       if (response.status === 204) {
@@ -201,6 +208,31 @@ class ApiClient {
     }
   }
 
+  private static async refreshSession(): Promise<AuthResponse> {
+    if (!refreshPromise) {
+      refreshPromise = this.request<AuthResponse>(
+        '/auth/refresh',
+        'POST',
+        undefined,
+        undefined,
+        false
+      )
+        .then((session) => {
+          useAuthStore.getState().setAuth(session.user, session.accessToken)
+          return session
+        })
+        .catch((error) => {
+          useAuthStore.getState().clearAuth()
+          throw error
+        })
+        .finally(() => {
+          refreshPromise = null
+        })
+    }
+
+    return refreshPromise
+  }
+
   private static getToken(): string {
     // Access token é armazenado em memória no authStore
     const token = useAuthStore.getState().accessToken
@@ -218,7 +250,7 @@ class ApiClient {
    * Retorna access token (memória) + refresh token (localStorage).
    *
    * @param payload - { email, password }
-   * @returns { user, accessToken, refreshToken }
+   * @returns { user, accessToken }
    * @throws Error com mensagem do backend se falhar
    */
   static async login(payload: LoginPayload): Promise<AuthResponse> {
@@ -231,7 +263,7 @@ class ApiClient {
    * Retorna access token + refresh token (registo automático autentica).
    *
    * @param payload - { name, email, password }
-   * @returns { user, accessToken, refreshToken }
+   * @returns { user, accessToken }
    * @throws Error se email já existe (409) ou validação falha (400)
    */
   static async register(payload: RegisterPayload): Promise<AuthResponse> {
@@ -243,18 +275,12 @@ class ApiClient {
    * Obtém novo access token usando refresh token.
    * Chamado automaticamente quando access token expira.
    *
-   * @param refreshToken - Refresh token armazenado
-   * @returns { user, accessToken, refreshToken }
+   * O browser envia automaticamente o cookie HttpOnly.
+   * @returns { user, accessToken }
    * @throws Error se refresh token inválido ou expirado
    */
-  static async refresh(
-    refreshToken: string
-  ): Promise<AuthResponse> {
-    return this.request<AuthResponse>(
-      '/auth/refresh',
-      'POST',
-      { refreshToken }
-    )
+  static async refresh(): Promise<AuthResponse> {
+    return this.refreshSession()
   }
 
   /**
@@ -262,12 +288,12 @@ class ApiClient {
    * Revoga refresh token no backend (limpa sessão).
    * Idempotente: não falha se token já expirou.
    *
-   * @param refreshToken - Refresh token a revogar
+   * O browser envia automaticamente o cookie HttpOnly a revogar.
    */
-  static async logout(refreshToken: string): Promise<void> {
+  static async logout(): Promise<void> {
     // Logout é idempotente: não falha mesmo se token já expirou
     try {
-      await this.request<void>('/auth/logout', 'POST', { refreshToken })
+      await this.request<void>('/auth/logout', 'POST', undefined, undefined, false)
     } catch {
       // Ignora erros (token já expirado é OK)
     }

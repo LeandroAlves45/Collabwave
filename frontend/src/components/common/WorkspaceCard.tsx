@@ -33,9 +33,9 @@ export function WorkspaceCard({
   return (
     <article
       className={cn(
-        'w-full text-left bg-cw-surface border-thin border-cw-border rounded-lg',
-        'p-4 transition-all duration-200',
-        'hover:border-cw-muted hover:bg-cw-surface/80',
+        'w-full text-left glass-surface rounded-lg',
+        'p-4 transition-[transform,box-shadow,border-color] duration-200 ease-out',
+        'hover:border-cw-wave/40 hover:glow-wave hover:-translate-y-0.5',
         'group',
         className
       )}
@@ -51,7 +51,9 @@ export function WorkspaceCard({
         </h3>
 
         {workspace.description && (
-          <p className="text-sm text-cw-muted mt-1 line-clamp-2">{workspace.description}</p>
+          <p className="text-sm text-cw-muted mt-1 line-clamp-2">
+            {workspace.description}
+          </p>
         )}
 
         <div className="flex items-center gap-4 mt-4 text-xs text-cw-secondary">

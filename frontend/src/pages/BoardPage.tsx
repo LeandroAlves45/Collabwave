@@ -6,9 +6,15 @@ import ApiClient from '@/services/api'
 import SocketService from '@/services/socket'
 import type { Task, ColumnWithTasks, TaskWithUsers, UserInfo } from '@/types/task'
 import { KanbanColumn } from '@/components/common/KanbanColumn'
+import { PresenceStack } from '@/components/common/PresenceAvatar'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Loader2, X, Plus } from 'lucide-react'
+import type { AuthUser } from '@/types/auth'
+
+// Task recem-atualizada por outro utilizador mostra o flash por esta duracao,
+// alinhada com a animacao `task-flash` (0.6s) definida em globals.css.
+const TASK_FLASH_DURATION_MS = 600
 
 function isUserInfo(value: unknown): value is UserInfo {
   if (!value || typeof value !== 'object') return false
@@ -21,7 +27,9 @@ function isUserInfo(value: unknown): value is UserInfo {
   )
 }
 
-const normalizeBoardTask = (task: Task | Record<string, unknown>): Task | TaskWithUsers => {
+const normalizeBoardTask = (
+  task: Task | Record<string, unknown>
+): Task | TaskWithUsers => {
   // REST e Socket podem devolver camelCase ou snake_case; a UI trabalha sempre com camelCase.
   const raw = task as Record<string, unknown>
 
@@ -29,8 +37,7 @@ const normalizeBoardTask = (task: Task | Record<string, unknown>): Task | TaskWi
     id: String(raw.id),
     columnId: String(raw.columnId ?? raw.column_id ?? ''),
     title: String(raw.title),
-    description:
-      typeof raw.description === 'string' ? raw.description : undefined,
+    description: typeof raw.description === 'string' ? raw.description : undefined,
     assigneeId:
       typeof (raw.assigneeId ?? raw.assignee_id) === 'string'
         ? String(raw.assigneeId ?? raw.assignee_id)
@@ -80,14 +87,36 @@ export function BoardPage(): ReactElement {
   const [selectedColumnId, setSelectedColumnId] = useState<string>('')
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDescription, setNewTaskDescription] = useState('')
-  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
+  const [newTaskPriority, setNewTaskPriority] = useState<
+    'low' | 'medium' | 'high' | 'urgent'
+  >('medium')
   const [isSubmittingTask, setIsSubmittingTask] = useState(false)
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
-  const [editingPriority, setEditingPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
+  const [editingPriority, setEditingPriority] = useState<
+    'low' | 'medium' | 'high' | 'urgent'
+  >('medium')
 
   const [isCreatingColumn, setIsCreatingColumn] = useState(false)
   const [newColumnTitle, setNewColumnTitle] = useState('')
+
+  const [onlineUsers, setOnlineUsers] = useState<AuthUser[]>([])
+  const [recentlyUpdatedTaskIds, setRecentlyUpdatedTaskIds] = useState<Set<string>>(
+    new Set()
+  )
+
+  // Marca uma task como recem-atualizada para acionar o flash visual em
+  // TaskCard; remove-a do conjunto depois da duracao da animacao.
+  const flashTask = useCallback((taskId: string) => {
+    setRecentlyUpdatedTaskIds((prev) => new Set(prev).add(taskId))
+    setTimeout(() => {
+      setRecentlyUpdatedTaskIds((prev) => {
+        const next = new Set(prev)
+        next.delete(taskId)
+        return next
+      })
+    }, TASK_FLASH_DURATION_MS)
+  }, [])
 
   const loadColumns = useCallback(async () => {
     if (!workspaceId) return
@@ -100,7 +129,9 @@ export function BoardPage(): ReactElement {
       const tasks = await ApiClient.listTasks(workspaceId)
 
       // Protecao contra duplicados vindos da API antes de montar o estado local.
-      const uniqueColumns = Array.from(new Map(columns.map((col) => [col.id, col])).values())
+      const uniqueColumns = Array.from(
+        new Map(columns.map((col) => [col.id, col])).values()
+      )
 
       setColumns(
         uniqueColumns.map((column) => ({
@@ -156,6 +187,11 @@ export function BoardPage(): ReactElement {
           ),
         }))
       })
+      flashTask(normalizedTask.id)
+    }
+
+    const handlePresenceUpdate = (data: { onlineUsers: AuthUser[] }) => {
+      setOnlineUsers(data.onlineUsers)
     }
 
     const handleTaskMoved = (data: {
@@ -200,6 +236,7 @@ export function BoardPage(): ReactElement {
           }
         })
       })
+      flashTask(data.taskId)
     }
 
     const handleTaskDeleted = (data: { taskId: string }) => {
@@ -215,14 +252,19 @@ export function BoardPage(): ReactElement {
     SocketService.on('task:updated', handleTaskUpdated)
     SocketService.on('task:moved', handleTaskMoved)
     SocketService.on('task:deleted', handleTaskDeleted)
+    SocketService.on('workspace:presence_update', handlePresenceUpdate)
 
     return () => {
+      // Sai da room antes de remover handlers para não receber eventos do board anterior.
+      SocketService.leaveWorkspace(workspaceId)
       SocketService.off('task:created', handleTaskCreated)
       SocketService.off('task:updated', handleTaskUpdated)
       SocketService.off('task:moved', handleTaskMoved)
       SocketService.off('task:deleted', handleTaskDeleted)
+      SocketService.off('workspace:presence_update', handlePresenceUpdate)
+      setOnlineUsers([])
     }
-  }, [workspaceId, navigate, loadColumns])
+  }, [workspaceId, navigate, loadColumns, flashTask])
 
   const handleAddTask = (columnId: string) => {
     setSelectedColumnId(columnId)
@@ -282,7 +324,11 @@ export function BoardPage(): ReactElement {
     }
   }
 
-  const handleTaskMoveRequest = async (taskId: string, targetColumnId: string, newPosition: number) => {
+  const handleTaskMoveRequest = async (
+    taskId: string,
+    targetColumnId: string,
+    newPosition: number
+  ) => {
     if (!workspaceId) return
     try {
       await ApiClient.moveTask(workspaceId, taskId, { targetColumnId, newPosition })
@@ -344,7 +390,10 @@ export function BoardPage(): ReactElement {
     }
   }
 
-  const openEditPriority = (taskId: string, currentPriority: 'low' | 'medium' | 'high' | 'urgent') => {
+  const openEditPriority = (
+    taskId: string,
+    currentPriority: 'low' | 'medium' | 'high' | 'urgent'
+  ) => {
     setEditingTaskId(taskId)
     setEditingPriority(currentPriority)
   }
@@ -352,7 +401,9 @@ export function BoardPage(): ReactElement {
   const handleSavePriority = async () => {
     if (!editingTaskId || !workspaceId) return
     try {
-      const updatedTask = await ApiClient.updateTask(workspaceId, editingTaskId, { priority: editingPriority })
+      const updatedTask = await ApiClient.updateTask(workspaceId, editingTaskId, {
+        priority: editingPriority,
+      })
       const normalizedTask = normalizeBoardTask(updatedTask)
       setColumns((prevColumns) =>
         prevColumns.map((col) => ({
@@ -392,20 +443,22 @@ export function BoardPage(): ReactElement {
           <h1 className="font-heading font-extrabold text-2xl text-cw-primary">Board</h1>
           <p className="text-sm text-cw-muted mt-1">Collaborate in real-time</p>
         </div>
-        <Button
-          onClick={() => navigate('/')}
-          variant="outline"
-          className="text-cw-muted hover:text-cw-primary"
-        >
-          ← Back to Workspaces
-        </Button>
+        <div className="flex items-center gap-4">
+          <PresenceStack users={onlineUsers} />
+          <Button
+            onClick={() => navigate('/')}
+            variant="outline"
+            className="text-cw-muted hover:text-cw-primary"
+          >
+            ← Back to Workspaces
+          </Button>
+        </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 overflow-x-auto p-6">
         {error && (
-          <div 
-            className="mb-6 rounded-md border border-cw-danger/40 bg-cw-danger/10 p-3 text-sm text-cw-danger">
+          <div className="mb-6 rounded-md border border-cw-danger/40 bg-cw-danger/10 p-3 text-sm text-cw-danger">
             {error}
           </div>
         )}
@@ -420,6 +473,7 @@ export function BoardPage(): ReactElement {
               onTaskMoved={handleTaskMoveRequest}
               onEditPriority={openEditPriority}
               onDeleteColumn={handleDeleteColumn}
+              recentlyUpdatedTaskIds={recentlyUpdatedTaskIds}
             />
           ))}
 
@@ -443,7 +497,10 @@ export function BoardPage(): ReactElement {
           <div className="bg-cw-surface border border-cw-border rounded-lg p-6 w-80">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-bold text-cw-primary">Add Column</h2>
-              <button onClick={() => setIsCreatingColumn(false)} className="text-cw-muted hover:text-cw-primary">
+              <button
+                onClick={() => setIsCreatingColumn(false)}
+                className="text-cw-muted hover:text-cw-primary"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -465,7 +522,11 @@ export function BoardPage(): ReactElement {
                 >
                   Create
                 </Button>
-                <Button variant="ghost" onClick={() => setIsCreatingColumn(false)} className="text-cw-muted hover:text-cw-secondary">
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsCreatingColumn(false)}
+                  className="text-cw-muted hover:text-cw-secondary"
+                >
                   Cancel
                 </Button>
               </div>
@@ -481,7 +542,9 @@ export function BoardPage(): ReactElement {
             <h2 className="font-heading font-bold text-cw-primary mb-4">Edit Priority</h2>
             <select
               value={editingPriority}
-              onChange={(e) => setEditingPriority(e.target.value as 'low' | 'medium' | 'high' | 'urgent')}
+              onChange={(e) =>
+                setEditingPriority(e.target.value as 'low' | 'medium' | 'high' | 'urgent')
+              }
               className="w-full px-3 py-2 bg-cw-base border border-cw-border rounded text-cw-primary text-sm mb-4"
             >
               <option value="low">Low Priority</option>
@@ -496,7 +559,11 @@ export function BoardPage(): ReactElement {
               >
                 Save
               </Button>
-              <Button variant="ghost" onClick={() => setEditingTaskId(null)} className="text-cw-muted hover:text-cw-secondary">
+              <Button
+                variant="ghost"
+                onClick={() => setEditingTaskId(null)}
+                className="text-cw-muted hover:text-cw-secondary"
+              >
                 Cancel
               </Button>
             </div>
@@ -510,7 +577,10 @@ export function BoardPage(): ReactElement {
           <div className="bg-cw-surface border border-cw-border rounded-lg p-6 w-96">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-bold text-cw-primary">Add Task</h2>
-              <button onClick={handleCancel} className="text-cw-muted hover:text-cw-primary">
+              <button
+                onClick={handleCancel}
+                className="text-cw-muted hover:text-cw-primary"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -532,7 +602,11 @@ export function BoardPage(): ReactElement {
 
               <select
                 value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value as 'low' | 'medium' | 'high' | 'urgent')}
+                onChange={(e) =>
+                  setNewTaskPriority(
+                    e.target.value as 'low' | 'medium' | 'high' | 'urgent'
+                  )
+                }
                 className="w-full px-3 py-2 bg-cw-base border border-cw-border rounded text-cw-primary text-sm"
               >
                 <option value="low">Low Priority</option>
@@ -549,7 +623,12 @@ export function BoardPage(): ReactElement {
                 >
                   {isSubmittingTask ? 'Creating...' : 'Create'}
                 </Button>
-                <Button variant="ghost" onClick={handleCancel} disabled={isSubmittingTask} className="text-cw-muted hover:text-cw-secondary">
+                <Button
+                  variant="ghost"
+                  onClick={handleCancel}
+                  disabled={isSubmittingTask}
+                  className="text-cw-muted hover:text-cw-secondary"
+                >
                   Cancel
                 </Button>
               </div>

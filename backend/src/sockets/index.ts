@@ -11,12 +11,12 @@ import { registerTaskHandler } from './handlers/task.handler.js';
 import type { CollabWaveSocket, CollabWaveServer } from './sockets.types';
 
 // Instancia partilhada apos initSocketServer.
-let io: CollabWaveServer;
+let io: CollabWaveServer | undefined;
 
 export function initSocketServer(httpServer: HttpServer): Server {
-  io = new Server(httpServer, {
+  const socketServer: CollabWaveServer = new Server(httpServer, {
     cors: {
-      origin: env.CORS_ORIGIN,
+      origin: env.CORS_ORIGINS,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -29,22 +29,22 @@ export function initSocketServer(httpServer: HttpServer): Server {
   });
 
   // Redis Adapter replica eventos de rooms entre instancias do servidor.
-  io.adapter(createAdapter(pubClient, subClient));
+  socketServer.adapter(createAdapter(pubClient, subClient));
   console.log('[SOCKET.IO] Redis Adapter configured.');
 
   // Autenticacao corre antes de qualquer handler de eventos.
-  io.use(socketAuthMiddleware);
+  socketServer.use(socketAuthMiddleware);
   console.log('[SOCKET.IO] Authentication middleware registered.');
 
-  io.on('connection', (socket: CollabWaveSocket) => {
-    const user = socket.data.user;
-    console.log(`[SOCKET:IO] Connected: ${user.email} (socket: ${socket.id})`);
+  socketServer.on('connection', (socket: CollabWaveSocket) => {
+    console.log(`[SOCKET.IO] Client connected: ${socket.id}`);
 
-    registerWorkspaceHandler(io, socket);
-    registerTaskHandler(io, socket);
+    registerWorkspaceHandler(socketServer, socket);
+    registerTaskHandler(socketServer, socket);
   });
 
-  return io;
+  io = socketServer;
+  return socketServer;
 }
 
 // Acesso seguro a instancia ja inicializada.
@@ -55,4 +55,12 @@ export function getIO(): CollabWaveServer {
     );
   }
   return io;
+}
+
+export async function closeSocketServer(): Promise<void> {
+  if (!io) return;
+
+  const currentServer = io;
+  io = undefined;
+  await new Promise<void>((resolve) => currentServer.close(() => resolve()));
 }

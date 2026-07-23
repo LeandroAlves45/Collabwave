@@ -16,42 +16,56 @@ function generateInviteCode(): string {
 }
 
 const DEFAULT_COLUMNS = ['Backlog', 'To Do', 'In Progress', 'Review', 'Done'];
+const INVITE_CODE_ATTEMPTS = 5;
+
+function isInviteCodeCollision(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const databaseError = error as { code?: string; constraint?: string };
+  return (
+    databaseError.code === '23505' &&
+    databaseError.constraint === 'workspaces_invite_code_unique'
+  );
+}
 
 export async function createWorkspace(
   userId: string,
   payload: CreateWorkspacePayload,
 ): Promise<Workspace> {
-  const inviteCode = generateInviteCode();
+  for (let attempt = 1; attempt <= INVITE_CODE_ATTEMPTS; attempt += 1) {
+    try {
+      return await db.transaction(async (trx) => {
+        const [newWorkspace] = await trx('workspaces')
+          .insert({
+            name: payload.name,
+            description: payload.description ?? null,
+            owner_id: userId,
+            invite_code: generateInviteCode(),
+          })
+          .returning('*');
 
-  // Workspace e owner devem ser gravados atomicamente.
-  const workspace = await db.transaction(async (trx) => {
-    const [newWorkspace] = await trx('workspaces')
-      .insert({
-        name: payload.name,
-        description: payload.description ?? null,
-        owner_id: userId,
-        invite_code: inviteCode,
-      })
-      .returning('*');
+        await trx('workspace_members').insert({
+          workspace_id: newWorkspace.id,
+          user_id: userId,
+          role: 'owner',
+        });
+        await trx('columns').insert(
+          DEFAULT_COLUMNS.map((title, position) => ({
+            workspace_id: newWorkspace.id,
+            title,
+            position,
+          })),
+        );
+        return newWorkspace as Workspace;
+      });
+    } catch (error) {
+      if (!isInviteCodeCollision(error) || attempt === INVITE_CODE_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
 
-    await trx('workspace_members').insert({
-      workspace_id: newWorkspace.id,
-      user_id: userId,
-      role: 'owner',
-    });
-
-    await trx('columns').insert(
-      DEFAULT_COLUMNS.map((title, position) => ({
-        workspace_id: newWorkspace.id,
-        title,
-        position,
-      })),
-    );
-
-    return newWorkspace as Workspace;
-  });
-
-  return workspace;
+  // O ciclo termina sempre por return ou throw; mantém a função total para TS.
+  throw new Error('Unable to allocate a unique invite code');
 }
 
 export async function getUserWorkspaces(

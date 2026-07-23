@@ -1,30 +1,15 @@
-# ============================================================
-# CollabWave — Continuous Integration Workflow
-# ============================================================
-# Este workflow é executado automaticamente pelo GitHub Actions
-# nos seguintes eventos:
-#   - push para os branches "develop" ou "main"
-#   - pull_request com destino a "develop" ou "main"
-
 name: CI
 
-# TRIGGERS - quando o workflow deve ser executado
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: [main, development_branch]
   pull_request:
-    branches:
-      - develop
-      - main
+    branches: [main, development_branch]
 
-# JOBS - define os trabalhos a serem executados
 jobs:
-  lint-and-test:
-    name: Lint, Test and Build
+  quality:
+    name: Lint, tests, E2E and builds
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:15-alpine
@@ -32,93 +17,60 @@ jobs:
           POSTGRES_DB: collabwave
           POSTGRES_USER: collabwave_user
           POSTGRES_PASSWORD: collabwave_pass
-        ports:
-          - 5432:5432
+        ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U collabwave_user -d collabwave"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+          --health-interval 10s --health-timeout 5s --health-retries 5
       redis:
         image: redis:7-alpine
-        ports:
-          - 6379:6379
+        ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+          --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      # Variáveis de ambiente para os testes
       DATABASE_URL: postgres://collabwave_user:collabwave_pass@localhost:5432/collabwave
       REDIS_URL: redis://localhost:6379
-      JWT_SECRET: test-jwt-secret
-      JWT_REFRESH_SECRET: test-refresh-secret
+      JWT_SECRET: ci-access-secret-which-is-at-least-32-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-which-is-different-and-long
+      CORS_ORIGINS: http://localhost:5173
+      RATE_LIMIT_MAX_REQUESTS: 1000
       NODE_ENV: test
-
-    # STEPS - etapas do trabalho
     steps:
-      # Checkout do código-fonte
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-
-      # Configuração do Node.js
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          cache: npm
           cache-dependency-path: |
             package-lock.json
             backend/package-lock.json
             frontend/package-lock.json
-
-      # Instalação das dependências da raiz
-      - name: Install root dependencies
-        run: npm ci
-
-      # Instalação das dependências do backend
-      - name: Install backend dependencies
-        run: npm ci
-        working-directory: backend
-
-      # Instalação das dependências do frontend
-      - name: Install frontend dependencies
-        run: npm ci
-        working-directory: frontend
-
-      # Execução das migrations
-      - name: Run backend migrations
-        run: npm run migrate
-        working-directory: backend
-
-      # Execução do lint
-      - name: Run ESLint
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Migration smoke test on empty database
+        run: npm run migrate --prefix backend
+      - name: Migration smoke test on migrated database
+        run: npm run migrate --prefix backend
+      - name: Lint
         run: npm run lint
-
-      # Instala as dependências do Playwright, incluindo os navegadores necessários para os testes E2E
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+      - name: Backend tests
+        run: npm run test:ci --prefix backend
+      - name: Frontend tests
+        run: npm run test --prefix frontend
+      - name: Production builds
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
         working-directory: frontend
-
-      # Executa os testes E2E com Playwright
-      - name: Run E2E tests
+      - name: End-to-end tests
         run: npm run test:e2e
         working-directory: frontend
-
-      # Execução dos testes com coverage
-      - name: Run tests with coverage
-        run: npm run test:ci
-
-      # Build de produção
-      #- name: Build production bundle
-      #run: npm run build
-
-      # Upload do coverage para o Codecov
-      #- name: Upload coverage to Codecov
-      #uses: codecov/codecov-action@v4
-      #with:
-      #token: ${{ secrets.CODECOV_TOKEN }}
-      #fail_ci_if_error: true
+      - name: Production dependency audit
+        run: |
+          npm audit --omit=dev --prefix backend
+          npm audit --omit=dev --prefix frontend

@@ -41,5 +41,9 @@ export interface AuthTokens {
 export interface AuthResponse {
   user: SafeUser;
   accessToken: string;
+}
+
+// O refresh token só atravessa a fronteira HTTP através de um cookie HttpOnly.
+export interface AuthSession extends AuthResponse {
   refreshToken: string;
 }

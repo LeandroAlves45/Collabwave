@@ -42,9 +42,7 @@ export function socketAuthMiddleware(
 
     socket.data.user = user;
 
-    console.log(
-      `[SOCKET.IO] Authenticated user: ${user.email} (socket: ${socket.id})`,
-    );
+    console.log(`[SOCKET.IO] Client authenticated: ${socket.id}`);
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {

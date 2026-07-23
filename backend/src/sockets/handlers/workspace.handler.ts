@@ -55,9 +55,7 @@ export function registerWorkspaceHandler(
       const room = buildRoomName(workspaceId);
       await socket.join(room);
 
-      console.log(
-        `[WORKSPACE] ${user.email} joined room ${room} (socket: ${socket.id}`,
-      );
+      console.log(`[WORKSPACE] Client joined room ${room} (socket: ${socket.id})`);
 
       await addUserToPresence(workspaceId, user.id, socket.id);
 
@@ -98,9 +96,7 @@ export function registerWorkspaceHandler(
       const onlineUsers = await getOnlineUsers(workspaceId);
       io.to(room).emit('workspace:presence_update', { onlineUsers });
 
-      console.log(
-        `[WORKSPACE] ${user.email} left room ${room} (socket: ${socket.id}`,
-      );
+      console.log(`[WORKSPACE] Client left room ${room} (socket: ${socket.id})`);
     } catch (error) {
       console.error(`[WORKSPACE] Error on workspace:leave -`, error);
       socket.emit('error', {
@@ -111,9 +107,7 @@ export function registerWorkspaceHandler(
   });
 
   socket.on('disconnect', async (reason) => {
-    console.log(
-      `[WORKSPACE] Cleaning up presence for ${user.email} reason: ${reason}`,
-    );
+    console.log(`[WORKSPACE] Cleaning up presence, reason: ${reason}`);
 
     try {
       const result = await removeUserFromAllWorkspaces(user.id, socket.id);

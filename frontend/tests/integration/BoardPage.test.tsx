@@ -178,6 +178,21 @@ describe('BoardPage', () => {
     })
   })
 
+  it('should leave the workspace room before removing socket listeners on unmount', async () => {
+    const { unmount } = renderBoardPage()
+
+    await waitFor(() => {
+      expect(mockJoinWorkspace).toHaveBeenCalledWith(mockWorkspaceId)
+    })
+
+    unmount()
+
+    expect(mockLeaveWorkspace).toHaveBeenCalledWith(mockWorkspaceId)
+    expect(mockLeaveWorkspace.mock.invocationCallOrder[0]).toBeLessThan(
+      mockOff.mock.invocationCallOrder[0]
+    )
+  })
+
   /**
    * TEST 3: Render Columns with Real Titles
    * 

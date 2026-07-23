@@ -2,7 +2,21 @@
 
 import { Request, Response, NextFunction } from 'express';
 import * as authService from './auth.services';
-import { registerSchema, loginSchema, refreshSchema } from './auth.validators';
+import { registerSchema, loginSchema } from './auth.validators';
+import {
+  clearRefreshCookie,
+  getRefreshTokenCookie,
+  setRefreshCookie,
+} from './auth.cookies';
+
+function exposeSession(
+  res: Response,
+  session: Awaited<ReturnType<typeof authService.login>>,
+): Omit<typeof session, 'refreshToken'> {
+  const { refreshToken, ...response } = session;
+  setRefreshCookie(res, refreshToken);
+  return response;
+}
 
 export async function registerController(
   req: Request,
@@ -12,7 +26,7 @@ export async function registerController(
   try {
     const input = registerSchema.parse(req.body);
 
-    const result = await authService.register(input);
+    const result = exposeSession(res, await authService.register(input));
 
     res.status(201).json({
       status: 'success',
@@ -30,7 +44,7 @@ export async function loginController(
 ): Promise<void> {
   try {
     const input = loginSchema.parse(req.body);
-    const result = await authService.login(input);
+    const result = exposeSession(res, await authService.login(input));
 
     res.status(200).json({
       status: 'success',
@@ -47,8 +61,8 @@ export async function refreshController(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { refreshToken } = refreshSchema.parse(req.body);
-    const tokens = await authService.refresh(refreshToken);
+    const refreshToken = getRefreshTokenCookie(req);
+    const tokens = exposeSession(res, await authService.refresh(refreshToken));
 
     res.status(200).json({
       status: 'success',
@@ -65,9 +79,9 @@ export async function logoutController(
   next: NextFunction,
 ): Promise<void> {
   try {
-    // O contrato atual aceita refreshToken apenas no body.
-    const { refreshToken } = refreshSchema.parse(req.body);
+    const refreshToken = getRefreshTokenCookie(req);
     await authService.logout(refreshToken);
+    clearRefreshCookie(res);
 
     res.status(204).send();
   } catch (error) {

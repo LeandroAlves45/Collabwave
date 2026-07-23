@@ -5,7 +5,6 @@
 # Uso: docker-compose up --build
 
 # Versão do Docker Compose
-version: "3.9"
 
 # VOLUMES - armazenamento persistente para dados e código
 volumes:

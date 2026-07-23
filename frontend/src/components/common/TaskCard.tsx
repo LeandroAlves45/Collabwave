@@ -1,7 +1,9 @@
 import type { ReactElement } from 'react'
+import { useState } from 'react'
 import { Trash2, Pencil } from 'lucide-react'
 import type { Task, TaskWithUsers } from '@/types/task'
 import { PriorityBadge } from './PriorityBadge'
+import { getAvatarColor, normalizeInitials } from '@/utils/avatar'
 
 interface TaskCardProps {
   task: Task | TaskWithUsers
@@ -15,30 +17,7 @@ interface TaskCardProps {
     taskId: string,
     currentPriority: 'low' | 'medium' | 'high' | 'urgent'
   ) => void
-}
-
-function getAvatarColor(initials: string): string {
-  // Paleta deterministica: as mesmas iniciais devem receber sempre a mesma cor.
-  const colors = [
-    'bg-cyan-500',
-    'bg-teal-500',
-    'bg-blue-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-rose-500',
-    'bg-orange-500',
-    'bg-amber-500',
-  ]
-  const safeInitials = normalizeInitials(initials)
-  if (safeInitials === '?') return 'bg-cw-muted'
-
-  const secondIndex = safeInitials.length > 1 ? 1 : 0
-  const code = safeInitials.charCodeAt(0) + safeInitials.charCodeAt(secondIndex)
-  return colors[code % colors.length]
-}
-
-function normalizeInitials(initials: string): string {
-  return initials.trim().slice(0, 2).toUpperCase() || '?'
+  isRecentlyUpdated?: boolean
 }
 
 function AvatarBadge({
@@ -65,15 +44,21 @@ export function TaskCard({
   onDelete,
   onDragStart,
   onEditPriority,
+  isRecentlyUpdated,
 }: TaskCardProps): ReactElement {
   // TaskWithUsers e opcional porque eventos do socket podem enviar apenas Task.
   const isTaskWithUsers = 'createdBy' in task
+  const [isDragging, setIsDragging] = useState(false)
 
   return (
     <div
       draggable
-      onDragStart={(e) => onDragStart?.(e, task.id, task.columnId)}
-      className="group bg-cw-surface border-thin border-cw-border rounded-lg p-3 hover:border-cw-muted transition-colors cursor-grab active:cursor-grabbing"
+      onDragStart={(e) => {
+        setIsDragging(true)
+        onDragStart?.(e, task.id, task.columnId)
+      }}
+      onDragEnd={() => setIsDragging(false)}
+      className={`group bg-cw-surface border-thin border-cw-border rounded-lg p-3 transition-[transform,box-shadow,border-color] duration-200 ease-out cursor-grab active:cursor-grabbing hover:border-cw-wave/40 hover:glow-wave ${isDragging ? 'scale-105 shadow-xl' : ''} ${isRecentlyUpdated ? 'animate-task-flash' : ''}`}
     >
       {/* Header: Título + Delete Button */}
       <div className="flex justify-between items-start gap-2 mb-2">

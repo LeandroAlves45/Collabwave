@@ -70,4 +70,4 @@ USER appuser
 EXPOSE 3001 
 
 # Em produção, corre o JavaScript compilado directamente com Node
-CMD ["node", "dist/app.js"]
+CMD ["npm", "run", "start:deploy"]

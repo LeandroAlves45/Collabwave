@@ -12,12 +12,25 @@ interface KanbanColumnProps {
   onDeleteTask: (taskId: string) => void
   onDeleteColumn?: (columnId: string) => void
   onTaskMoved?: (taskId: string, targetColumnId: string, newPosition: number) => void
-  onEditPriority?: (taskId: string, currentPriority: 'low' | 'medium' | 'high' | 'urgent') => void
+  onEditPriority?: (
+    taskId: string,
+    currentPriority: 'low' | 'medium' | 'high' | 'urgent'
+  ) => void
+  recentlyUpdatedTaskIds?: ReadonlySet<string>
 }
 
-export function KanbanColumn({ column, onAddTask, onDeleteTask, onTaskMoved, onEditPriority, onDeleteColumn }: KanbanColumnProps): ReactElement {
+export function KanbanColumn({
+  column,
+  onAddTask,
+  onDeleteTask,
+  onTaskMoved,
+  onEditPriority,
+  onDeleteColumn,
+  recentlyUpdatedTaskIds,
+}: KanbanColumnProps): ReactElement {
   const tasks = column.tasks as (Task | TaskWithUsers)[]
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
     // dataTransfer leva o id da task entre colunas; o estado local serve como fallback.
@@ -29,6 +42,11 @@ export function KanbanColumn({ column, onAddTask, onDeleteTask, onTaskMoved, onE
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = () => {
+    setIsDragOver(false)
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -40,13 +58,15 @@ export function KanbanColumn({ column, onAddTask, onDeleteTask, onTaskMoved, onE
     const newPosition = tasks.length
     onTaskMoved?.(taskId, column.id, newPosition)
     setDraggedTaskId(null)
+    setIsDragOver(false)
   }
 
   return (
     <div
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="w-80 shrink-0 bg-cw-surface rounded-lg p-4 flex flex-col"
+      className={`w-80 shrink-0 glass-surface rounded-lg p-4 flex flex-col transition-shadow duration-200 ${isDragOver ? 'glow-wave' : ''}`}
     >
       {/* WaveLine */}
       <WaveLine isActive className="mb-4" />
@@ -55,7 +75,9 @@ export function KanbanColumn({ column, onAddTask, onDeleteTask, onTaskMoved, onE
       <div className="flex items-center justify-between mb-4 group">
         <div>
           <h2 className="font-heading font-bold text-cw-primary">{column.title}</h2>
-          <p className="text-xs text-cw-muted">{tasks.length} task{tasks.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-cw-muted">
+            {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <button
           onClick={() => onDeleteColumn?.(column.id)}
@@ -75,6 +97,7 @@ export function KanbanColumn({ column, onAddTask, onDeleteTask, onTaskMoved, onE
             onDelete={onDeleteTask}
             onDragStart={handleDragStart}
             onEditPriority={onEditPriority}
+            isRecentlyUpdated={recentlyUpdatedTaskIds?.has(task.id)}
           />
         ))}
       </div>

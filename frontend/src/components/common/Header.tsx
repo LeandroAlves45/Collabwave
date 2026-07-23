@@ -3,6 +3,7 @@
 
 import { useAuth } from '@/hooks/useAuth'
 import { Logo } from '@/components/common/Logo'
+import { ConnectionStatus } from '@/components/common/ConnectionStatus'
 import { Button } from '@/components/ui/Button'
 import { LogOut } from 'lucide-react'
 import { cn } from '@/utils/cn'
@@ -38,6 +39,7 @@ export function Header({ workspaceName, className, onLogout }: HeaderProps) {
       {/* Info do utilizador */}
       {user && (
         <div className="ml-auto flex items-center gap-3">
+          <ConnectionStatus />
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cw-accent text-xs font-bold text-[#041119]">
             {user.name?.charAt(0).toUpperCase() ?? 'U'}
           </span>

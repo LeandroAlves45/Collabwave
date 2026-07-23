@@ -57,19 +57,21 @@ test.describe('Authentication Flows', () => {
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(/\/$/, { timeout: 15000 })
 
-    const refreshTokenBefore = await page.evaluate(() =>
-      localStorage.getItem('refreshToken')
-    )
-    expect(refreshTokenBefore).toBeTruthy()
+    expect(
+      await page.evaluate(() => localStorage.getItem('refreshToken'))
+    ).toBeNull()
+    const cookiesBefore = await page.context().cookies()
+    expect(cookiesBefore.some((cookie) => cookie.name === 'collabwave_refresh')).toBe(true)
 
     await page.reload()
 
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByRole('heading', { name: /your workspaces/i })).toBeVisible()
 
-    const refreshTokenAfter = await page.evaluate(() =>
-      localStorage.getItem('refreshToken')
-    )
-    expect(refreshTokenAfter).toBeTruthy()
+    expect(
+      await page.evaluate(() => localStorage.getItem('refreshToken'))
+    ).toBeNull()
+    const cookiesAfter = await page.context().cookies()
+    expect(cookiesAfter.some((cookie) => cookie.name === 'collabwave_refresh')).toBe(true)
   })
 })

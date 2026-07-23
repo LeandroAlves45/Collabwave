@@ -15,6 +15,7 @@ import type {
   TaskWithUsersAndWorkspace,
 } from './task.types.js';
 import { getInitials } from '../../utils/user.js';
+import type { Knex } from 'knex';
 
 async function resolveTaskMembership(
   taskId: string,
@@ -147,10 +148,11 @@ export async function getWorkspaceTasks(
 async function validateAssignee(
   assigneeId: string | null | undefined,
   workspaceId: string,
+  query: Knex | Knex.Transaction = db,
 ): Promise<void> {
   if (!assigneeId) return;
 
-  const isMember = await db('workspace_members')
+  const isMember = await query('workspace_members')
     .where({ workspace_id: workspaceId, user_id: assigneeId })
     .first();
 
@@ -165,53 +167,55 @@ export async function createTask(
   userId: string,
   payload: CreateTaskPayload,
 ): Promise<TaskWithUsersAndWorkspace> {
-  // Impede criar tasks em colunas fora do workspace ou sem membership.
-  const column = await db('columns')
-    .join('workspace_members', function () {
-      this.on(
-        'workspace_members.workspace_id',
-        '=',
-        'columns.workspace_id',
-      ).andOnVal('workspace_members.user_id', '=', userId);
-    })
-    .where({
-      'columns.id': payload.columnId,
-      'columns.workspace_id': workspaceId,
-    })
-    .select('columns.*')
-    .first();
+  const newTask = await db.transaction(async (trx) => {
+    const column = await trx('columns')
+      .join('workspace_members', function () {
+        this.on(
+          'workspace_members.workspace_id',
+          '=',
+          'columns.workspace_id',
+        ).andOnVal('workspace_members.user_id', '=', userId);
+      })
+      .where({
+        'columns.id': payload.columnId,
+        'columns.workspace_id': workspaceId,
+      })
+      .select('columns.*')
+      .forUpdate()
+      .first();
 
-  if (!column) {
-    throw new AppError('Column not found or access denied', 404);
-  }
+    if (!column) {
+      throw new AppError('Column not found or access denied', 404);
+    }
 
-  await validateAssignee(payload.assigneeId, workspaceId);
+    await validateAssignee(payload.assigneeId, workspaceId, trx);
+    const maxPositionResult = await trx('tasks')
+      .where({ column_id: payload.columnId })
+      .max('position as maxPos')
+      .first();
+    const nextPosition =
+      maxPositionResult?.maxPos !== null &&
+      maxPositionResult?.maxPos !== undefined
+        ? Number(maxPositionResult.maxPos) + 1
+        : 0;
 
-  const maxPositionResult = await db('tasks')
-    .where({ column_id: payload.columnId })
-    .max('position as maxPos')
-    .first();
+    const [createdTask] = await trx('tasks')
+      .insert({
+        column_id: payload.columnId,
+        title: payload.title,
+        description: payload.description ?? null,
+        priority: payload.priority ?? 'medium',
+        due_date: payload.dueDate ?? null,
+        assignee_id: payload.assigneeId ?? null,
+        created_by: userId,
+        position: nextPosition,
+      })
+      .returning('*');
 
-  const nextPosition =
-    maxPositionResult?.maxPos !== null &&
-    maxPositionResult?.maxPos !== undefined
-      ? (maxPositionResult.maxPos as number) + 1
-      : 0;
+    return createdTask as Task;
+  });
 
-  const [newTask] = await db('tasks')
-    .insert({
-      column_id: payload.columnId,
-      title: payload.title,
-      description: payload.description ?? null,
-      priority: payload.priority ?? 'medium',
-      due_date: payload.dueDate ?? null,
-      assignee_id: payload.assigneeId ?? null,
-      created_by: userId,
-      position: nextPosition,
-    })
-    .returning('*');
-
-  return getTaskWithUsers((newTask as Task).id);
+  return getTaskWithUsers(newTask.id);
 }
 
 export async function updateTask(
@@ -251,8 +255,8 @@ export async function moveTask(
   userId: string,
   payload: MoveTaskPayload,
 ): Promise<TaskWithWorkspace> {
-  const task = await resolveTaskMembership(taskId, userId);
-  const { workspace_id } = task;
+  const authorizedTask = await resolveTaskMembership(taskId, userId);
+  const { workspace_id } = authorizedTask;
 
   const targetColumn = await db('columns')
     .where({ id: payload.targetColumnId, workspace_id })
@@ -262,25 +266,33 @@ export async function moveTask(
     throw new AppError('Target column not found in the same workspace', 404);
   }
 
-  // Na mesma coluna, a task atual nao conta para o limite.
-  const targetCount = await db('tasks')
-    .where('column_id', payload.targetColumnId)
-    .count('id as n')
-    .first()
-    .then((r) => Number(r?.n ?? 0));
-
-  const sameColumn = task.column_id === payload.targetColumnId;
-  const maxPosition = sameColumn ? targetCount - 1 : targetCount;
-  const clampedPosition = Math.max(
-    0,
-    Math.min(payload.newPosition, maxPosition),
-  );
-
-  if (sameColumn && task.position === clampedPosition) {
-    return task as TaskWithWorkspace;
-  }
-
   const updatedTask = await db.transaction(async (trx) => {
+    // Ordem estável das locks evita deadlocks em movimentos cruzados.
+    await trx('columns')
+      .whereIn(
+        'id',
+        [authorizedTask.column_id, payload.targetColumnId].sort(),
+      )
+      .orderBy('id')
+      .forUpdate();
+
+    const task = (await trx('tasks')
+      .where({ id: taskId })
+      .forUpdate()
+      .first()) as Task;
+    const targetCount = await trx('tasks')
+      .where('column_id', payload.targetColumnId)
+      .count('id as n')
+      .first()
+      .then((result) => Number(result?.n ?? 0));
+    const sameColumn = task.column_id === payload.targetColumnId;
+    const maxPosition = sameColumn ? targetCount - 1 : targetCount;
+    const clampedPosition = Math.max(
+      0,
+      Math.min(payload.newPosition, maxPosition),
+    );
+    if (sameColumn && task.position === clampedPosition) return task;
+
     if (sameColumn) {
       const oldPos = task.position;
       const newPos = clampedPosition;

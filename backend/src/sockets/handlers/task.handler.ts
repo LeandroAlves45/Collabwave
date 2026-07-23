@@ -59,7 +59,7 @@ export function registerTaskHandler(
       const room = buildRoomName(payload.workspaceId);
       io.to(room).emit('task:created', { task: toTaskResponse(task) });
 
-      console.log(`[TASK] task:created by ${user.email} - taskId: ${task.id}`);
+      console.log(`[TASK] task:created - taskId: ${task.id}`);
     } catch (error) {
       const appError = error as { statusCode?: number; message?: string };
       if (appError.statusCode === 403 || appError.statusCode === 404) {
@@ -112,7 +112,7 @@ export function registerTaskHandler(
 
       io.to(room).emit('task:updated', { task: toTaskResponse(task) });
 
-      console.log(`[TASK] task:updated by ${user.email} - taskId: ${task.id}`);
+      console.log(`[TASK] task:updated - taskId: ${task.id}`);
     } catch (error) {
       const appError = error as { statusCode?: number; message?: string };
       if (appError.statusCode === 404 || appError.statusCode === 403) {
@@ -174,7 +174,7 @@ export function registerTaskHandler(
         movedBy: user.id,
       });
 
-      console.log(`[TASK] task:moved by ${user.email} - taskId: ${task.id}`);
+      console.log(`[TASK] task:moved - taskId: ${task.id}`);
     } catch (error) {
       const appError = error as { statusCode?: number; message?: string };
       if (appError.statusCode === 404 || appError.statusCode === 403) {
@@ -209,7 +209,7 @@ export function registerTaskHandler(
         taskId: deletedTask.taskId,
         deletedBy: user.id,
       });
-      console.log(`[TASK] task:deleted by ${user.email} - taskId: ${deletedTask.taskId}`);
+      console.log(`[TASK] task:deleted - taskId: ${deletedTask.taskId}`);
     } catch (error) {
       const appError = error as { statusCode?: number; message?: string };
       if (appError.statusCode === 404 || appError.statusCode === 403) {

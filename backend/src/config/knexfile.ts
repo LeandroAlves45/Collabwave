@@ -9,6 +9,16 @@ import path from 'path';
 // executado a partir de outro diretorio.
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
+const compiledForProduction = path.extname(__filename) === '.js';
+const migrations = {
+  directory: path.resolve(
+    __dirname,
+    compiledForProduction ? '../migrations' : '../../migrations',
+  ),
+  extension: compiledForProduction ? 'js' : 'ts',
+  tableName: 'knex_migrations',
+};
+
 const config: Record<string, Knex.Config> = {
   development: {
     client: 'pg',
@@ -21,12 +31,7 @@ const config: Record<string, Knex.Config> = {
       ssl: false,
     },
     pool: { min: 2, max: 10 },
-    migrations: {
-      // Caminho relativo ao arquivo compilado/executado pelo Knex.
-      directory: '../../migrations',
-      extension: 'ts',
-      tableName: 'knex_migrations',
-    },
+    migrations,
     // Debug em dev mostra as queries geradas, o que ajuda a investigar
     // problemas de migrations e consultas.
     debug: true,
@@ -39,14 +44,13 @@ const config: Record<string, Knex.Config> = {
       // Muitos provedores Postgres gerenciados exigem SSL. rejectUnauthorized
       // false evita falhas quando o certificado do provedor nao esta na cadeia
       // local de confianca.
-      ssl: { rejectUnauthorized: false },
+      ssl:
+        process.env.DATABASE_SSL === 'false'
+          ? false
+          : { rejectUnauthorized: false },
     },
     pool: { min: 2, max: 10 },
-    migrations: {
-      directory: '../../migrations',
-      extension: 'ts',
-      tableName: 'knex_migrations',
-    },
+    migrations,
     debug: false,
   },
   test: {
@@ -56,11 +60,7 @@ const config: Record<string, Knex.Config> = {
       ssl: false,
     },
     pool: { min: 2, max: 10 },
-    migrations: {
-      directory: '../../migrations',
-      extension: 'ts',
-      tableName: 'knex_migrations',
-    },
+    migrations,
     debug: false,
   },
 };
